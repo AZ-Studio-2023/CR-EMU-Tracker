@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>动车组担当查询</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no">
+    <meta name="renderer" content="webkit">
+    <link href="https://img.picui.cn/free/2024/11/08/672dd11519a5a.png" rel="icon">
+    <link href="https://img.picui.cn/free/2024/11/08/672dd11519a5a.png" rel="shortcut icon">
+    <script src="https://cdn.jsdmirror.cn/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <link href="https://cdn.jsdmirror.cn/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdmirror.cn/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        @import url('https://static.zeoseven.com/zsft/69/main/result.css');
+
+        html {
+            font-family: "Noto Sans CJK SC";
+            font-weight: normal;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 flex flex-col min-h-screen">
+    <nav class="bg-blue-600 shadow">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-14">
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-white hover:bg-blue-700 px-3 py-2 rounded-sm transition duration-150">
+                        <span class="text-lg font-semibold">动车组担当查询</span>
+                    </a>
+                </div>
+                <div class="flex items-center">
+                    <a href="https://github.com/AZ-Studio-2023/CR-EMU-Tracker"
+                        class="text-white hover:bg-blue-700 px-4 py-2 rounded transition duration-150 flex items-center space-x-2">
+                        <span>Github</span>
+                        <i class="fa fa-github"></i>
+                    </a>
+                    <a href="/docs"
+                        class="text-white hover:bg-blue-700 px-4 py-2 rounded transition duration-150 flex items-center space-x-2">
+                        <span>API文档</span>
+                        <i class="fa fa-code"></i>
+                    </a>
+                    <a href="/faq"
+                        class="text-white hover:bg-blue-700 px-4 py-2 rounded transition duration-150 flex items-center space-x-2">
+                        <span>关于</span>
+                        <i class="fa fa-info-circle"></i>
+                    </a>
+
+
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex-grow">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="bg-white shadow rounded-sm p-4 mb-4">
+                <div class="flex items-center space-x-4">
+                    <div class="flex-1">
+                        <input type="text" id="search-history-kw" placeholder="车次号/车号(支持模糊查询)"
+                            class="w-full transition duration-300 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <button id="search-history-trigger"
+                        class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 flex items-center space-x-2">
+                        <span>查询</span>
+                        <i class="fa fa-search"></i>
+                    </button>
+                    <div class="flex items-center">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="search-history-show-flag" checked
+                                class="form-checkbox h-4 w-4 text-blue-600 rounded">
+                            <span class="ml-2 text-gray-700">显示尚未出发车次</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-blue-100 p-4 mb-4 rounded flex items-start">
+                <div class="flex-shrink-0">
+                    <i class="fa fa-info-circle text-blue-500"></i>
+                </div>
+                <div class="ml-3 flex-1">
+                    <p class="text-sm text-blue-800">
+                        本站尚在测试中，信息可能存在缺失，请综合参考。详情请看<a href="/faq"
+                            class="font-medium underline hover:text-blue-900">关于页面</a><br>
+                        每天凌晨0:02-1:42更新当天数据，该时间段内查询可能出现缺失，请谅解。
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-yellow-100 p-4 mb-4 rounded flex items-start">
+                <div class="flex-shrink-0">
+                    <i class="fa fa-warning text-yellow-500"></i>
+                </div>
+                <div class="ml-3 flex-1">
+                    <p class="text-sm text-yellow-800">
+                        本站信息仅供参考，请以铁路局运用实际为准。不建议作为购票依据。
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-white shadow rounded-sm overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                担当日</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                担当车次</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                车号</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result" class="bg-white divide-y divide-gray-200">
+                        <tr class="hover:bg-gray-50 transition duration-300">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-blue-600 text-white py-6">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center">
+                <b>RailGo Project</b>&nbsp;&nbsp;|&nbsp;&nbsp;❤ Build with love
+                <br>
+                By TKP30 & AZ Studio
+                <br>
+                <span id="stats" class="text-sm opacity-75">本站自上次启动已累计运行 0 天 0 小时，访问 0 次，查询 0 次。</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function showAlert(message, type = 'error') {
+
+            $('.alert-float').remove();
+
+            let styles = {
+                error: 'bg-red-50 text-red-700',
+                warning: 'bg-yellow-50 text-yellow-700',
+                success: 'bg-green-50 text-green-700'
+            };
+
+            const alert = $(`
+                <div class="alert-float fixed top-4 left-1/2 transform -translate-x-1/2 translate-y-0 opacity-0 p-4 rounded shadow-lg flex items-start space-x-4 ${styles[type]} transition-all duration-200 ease-out">
+                    <div class="flex-shrink-0">
+                        ${type === 'error' ? `
+                            <i class="fa fa-times-circle text-red-400"></i>
+                        ` : type === 'warning' ? `
+                            <i class="fa fa-warning text-yellow-500"></i>
+                        ` : `
+                            <i class="fa fa-check-circle text-green-400"></i>
+                        `}
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm">${message}</p>
+                    </div>
+                </div>
+            `);
+
+            $('body').append(alert);
+
+            alert[0].offsetHeight;
+
+            requestAnimationFrame(() => {
+                alert.css({
+                    transform: 'translate(-50%, 1rem)',
+                    opacity: '1'
+                });
+            });
+
+            setTimeout(() => {
+                alert.css({
+                    transform: 'translate(-50%, 0)',
+                    opacity: '0'
+                });
+
+                setTimeout(() => {
+                    alert.remove();
+                }, 200);
+            }, 3000);
+        }
+
+        function directSearch(n) {
+            $("#search-history-kw").val(n);
+            $("#search-history-trigger").click();
+        }
+
+        function sortTable() {
+            $("#result").empty();
+            var data = JSON.parse(sessionStorage.getItem("cache"));
+            var showflag = $("#search-history-show-flag").is(":checked");
+            var k = 0;
+            if (data == undefined || data == null) {
+                $("#result").append(`<tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                        </tr>`);
+                return;
+            }
+            for (var i = 0; i < data.length; i++) {
+                if (!showflag && Date.now() < Date.parse(data[i].runDate)) {
+                    continue;
+                }
+                if (data[i].trainCode.split(" + ").length > 1) {
+                    $("#result").append(`<tr class="hover:bg-gray-50 transition duration-300"><td class="px-6 py-4 text-sm text-gray-500">${k + 1}</td><td class="px-6 py-4 text-sm text-gray-500">${data[i].runDate}</td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainNum.split("/")[0]}')">${data[i].trainNum}</a></td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode.split(" + ")[0]}')">${data[i].trainCode.split(" + ")[0]}</a> + <a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode.split(" + ")[1]}')">${data[i].trainCode.split(" + ")[1]}</a></td></tr>`);
+                } else {
+                    $("#result").append(`<tr class="hover:bg-gray-50 transition duration-300"><td class="px-6 py-4 text-sm text-gray-500">${k + 1}</td><td class="px-6 py-4 text-sm text-gray-500">${data[i].runDate}</td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainNum.split("/")[0]}')">${data[i].trainNum}</a></td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode}')">${data[i].trainCode}</a></td></tr>`);
+                }
+                k++;
+            }
+        }
+
+        $("#search-history-show-flag").click((_) => {
+            sortTable();
+        });
+
+        $("#search-history-trigger").click((_) => {
+            var val = $("#search-history-kw").val();
+            if (val == "") {
+                showAlert("不能输入空值", "error");
+                return;
+            }
+
+            $.ajax({
+                url: "/api/query",
+                method: "GET",
+                data: {
+                    keyword: val
+                },
+                success: (data) => {
+                    if (!data.success) {
+                        showAlert("查询失败，请确保输入正确", "error");
+                        return;
+                    }
+
+                    if (data.success && data.data.length == 0) {
+                        showAlert("未查询到数据", "warning");
+                        return;
+                    }
+                    showAlert("查询成功","success");
+                    sessionStorage.setItem("cache", JSON.stringify(data.data));
+                    sortTable();
+                },
+                error: () => {
+                    showAlert("网络错误，请稍后再试", "error");
+                },
+                timeout: 3000
+            })
+        });
+
+        $(window).on("beforeunload", (_) => {
+            sessionStorage.clear();
+        });
+
+        function updateStats() {
+            $.ajax({
+                url: "/api/stats",
+                method: "GET",
+                success: (data) => {
+                    $("#stats").text(
+                        `本站自上次启动已累计运行 ${data.days} 天 ${data.hours} 小时，访问 ${data.visits} 次，查询 ${data.queries} 次。`
+                    );
+                }
+            });
+
+            if (!sessionStorage) {
+                showAlert("您的浏览器过于陈旧，不支持本站运行需要的部分功能，请升级浏览器再试。", "error");
+            }
+        }
+
+        updateStats();
+
+        setInterval(updateStats, 60000);
+    </script>
+</body>
+
+</html>

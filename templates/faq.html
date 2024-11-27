@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>动车组担当查询</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no">
+    <meta name="renderer" content="webkit">
+    <link href="https://img.picui.cn/free/2024/11/08/672dd11519a5a.png" rel="icon">
+    <link href="https://img.picui.cn/free/2024/11/08/672dd11519a5a.png" rel="shortcut icon">
+    <script src="https://cdn.jsdmirror.cn/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <link href="https://cdn.jsdmirror.cn/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdmirror.cn/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        @import url('https://static.zeoseven.com/zsft/69/main/result.css');
+
+        html {
+            font-family: "Noto Sans CJK SC";
+            font-weight: normal;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+    <nav class="bg-blue-600 shadow">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex h-14">
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-white hover:bg-blue-700 px-3 py-2 rounded transition duration-150 flex items-center space-x-2">
+                        <i class="fa fa-arrow-left"></i>
+                        <span class="text-lg font-semibold">动车组担当查询</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-8">
+            <h1 class="text-3xl font-bold mb-6">关于本站</h1>
+            <hr class="my-6">
+
+            <h5 class="text-xl font-semibold mb-4">开发人员</h5>
+            <div class="grid gap-2 grid-cols-2">
+                <div class="border border-gray-300 rounded-sm p-4 grid grid-flow-col auto-cols-max">
+                    <img class="w-20 rounded-full flex-initial" src="https://avatars.githubusercontent.com/u/53939187">
+                    <div class="content-center ml-3">
+                        <span class="text-3xl">
+                            <a href="https://github.com/tkp30">TKP30</a></span>
+                        <br>
+                        <span>爬取功能，基本架构，运维</span>
+                    </div>
+                </div>
+                <div class="border border-gray-300 rounded-sm p-4 grid grid-flow-col auto-cols-max">
+                    <img class="w-20 rounded-full flex-initial" src="https://avatars.githubusercontent.com/u/76240341">
+                    <div class="content-center ml-3">
+                        <span class="text-3xl">
+                            <a href="https://github.com/zlk-sys">辰墨</a></span>
+                        <br>
+                        <span>UI</span>
+                    </div>
+                </div>
+            </div>
+            <p class="mb-6"></p>
+
+            <h5 class="text-xl font-semibold mb-4">Changelog</h5>
+            <ul class="list-disc pl-6 mb-6">
+                <li class="mb-2">2024-11-03: 开始运营。</li>
+                <li class="mb-2">2024-11-07: 上线。</li>
+                <li class="mb-2">2024-11-24: 更换UI、开始支持未来查询。</li>
+            </ul>
+
+            <h5 class="text-xl font-semibold mb-4">赞助</h5>
+            <p class="mb-4">本项目为纯公益项目，没有任何的恰烂钱行为，但这意味着我们需要自费以维持这个网站的生存。</p>
+            <p class="mb-4">如果您能，欢迎帮我们宣传或捐款。</p>
+            <p class="mb-4"><a class="underline" href="https://afdian.com/a/xhg78999">爱发电（@TKP30）</a></p>
+
+            <h5 class="text-xl font-semibold mb-4">写在最后</h5>
+            <p class="mb-4">也不知道是什么时候构思的想法，总之从（2024年）暑假一直折腾到11月，这期间搞了无数的动作，从逆向到架构研究了个遍，付出的各种成本非常高。</p>
+            <p class="mb-4">我是一个孤独的爱好者，在圈内没有任何朋友，从未有任何出彩的事情，还被过去和现在的槽点熏黑。</p>
+            <p class="mb-4">但我是一个乐观的人，对未来始终报以热切的希望。也许创作这个网站，纯粹就是一种自我安慰，但是作为一个从未成功的人，也许这也能充当一种成功的尝试吧。</p>
+            <p class="mb-4">黑暗的巨石砸碎了无数的胸口，但你其实也可以爬上去慢慢把他凿穿。</p>
+            <p class="mb-4">致永远的乐趣和自由！</p>
+            <p class="mb-6">——TKP30</p>
+
+            <h1 class="text-3xl font-bold mb-6">常见问题</h1>
+            <hr class="my-6">
+
+            <h5 class="text-xl font-semibold mb-4">这里是干什么的？</h5>
+            <p class="mb-4">本站提供的是动车组运用和担当的查询功能，可以通过车次和车号查询，并合并显示重连车组。</p>
+            <p class="mb-6">理论上本站使用的后端可以获得未来的数据，但是这个功能并不稳定，因此暂时不开放查询。</p>
+
+            <h5 class="text-xl font-semibold mb-4">这里跟<a href="https://rail.re" class="underline">rail.re</a>有什么关系？</h5>
+            <p class="mb-4">除了功能相似外没有任何关系。</p>
+            <p class="mb-4">本站的数据并非从那个地方爬取，也没有使用<a href="https://github.com/Arnie97/emu-log" class="underline">emu-log</a>的任何代码。</p>
+            <p class="mb-6">不过，你可以把那个地方当作另一个参考来源——碰上备车可能它更准。</p>
+
+            <h5 class="text-xl font-semibold mb-4">这里的数据从哪来？</h5>
+            <p class="mb-6">都是铁路12306的官方数据。简单地说，利用了12306 APP里面一个没有展示的字段数据。</p>
+
+            <h5 class="text-xl font-semibold mb-4">能查什么车？</h5>
+            <p class="mb-2">除了下列车次外，无特殊问题都能查询：</p>
+            <ul class="list-disc pl-6 mb-6">
+                <li class="mb-2">非国铁担当和运维的车次，如港铁动感号、中老铁路等。</li>
+                <li class="mb-2">市域和公交化城际铁路，如上海金山铁路、广东城际、北京市郊铁路等。</li>
+                <li class="mb-2">无法在12306 APP上购买非无座票的特殊车次，如D083。</li>
+                <li class="mb-2">非G、D、C字头的动车组列车，如Z5016。</li>
+            </ul>
+
+            <h5 class="text-xl font-semibold mb-4">查到的信息和我看见的不一样？</h5>
+            <p class="font-bold mb-4">本站的一切信息都只是参考，不是一定准确。</p>
+            <p class="mb-6">碰上临时取消、启用备车以及高峰期间部分在线解编的车次数据是肯定不准的。</p>
+
+            <h5 class="text-xl font-semibold mb-4">会开源吗？</h5>
+            <a href="https://github.com/AZ-Studio-2023/CR-EMU-Tracker" class="underline">AZ-Studio-2023/CR-EMU-Tracker</a>
+        </div>
+    </div>
+
+    <footer class="bg-blue-600 text-white py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center">
+                <b>RailGo Project</b>&nbsp;&nbsp;|&nbsp;&nbsp;❤ Build with love
+                <br>
+                By TKP30 & AZ Studio
+            </div>
+        </div>
+    </footer>
+</body>
+
+</html>
