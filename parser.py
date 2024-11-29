@@ -16,7 +16,8 @@ from concurrent.futures import ThreadPoolExecutor
 UNIQUE = []
 commits = 0
 
-logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(message)s", filename="cr-emu.log")
 logger = logging.getLogger("TrainTrack")
 logger.setLevel(logging.DEBUG)
 
@@ -41,16 +42,13 @@ def getTrainList(day=0):
             for x in range(5):
                 try:
                     req = requests.get(
-                        f"https://search.12306.cn/search/v1/train/search?keyword={key+str(tn)}&date={formatTime(-day)}")
+                        f"https://search.12306.cn/search/v1/h5/search?keyword={key+str(tn)}")
                     jr = req.json()
                     for car in jr["data"]:
-                        if car["station_train_code"] in UNIQUE:
+                        if car["params"]["station_train_code"] in UNIQUE or car["type"] != "001":
                             continue
-                        yield car["station_train_code"]
-                        # logger.info(f"搜索到 {car['station_train_code']}")
-                    # logger.info("-----")
+                        yield car["params"]["station_train_code"]
                     logger.info(f"{key}{tn} 号段搜索好")
-                    time.sleep(2)
                     break
                 except Exception as e:
                     logger.info(f"{key}{tn} 号段限速")
@@ -64,7 +62,6 @@ def getTrainList(day=0):
 def findRunTrains(day=0):
     global UNIQUE, commits
     db = sqlite3.connect("./records.db")
-    c = mpaas.MpaaSClient()
 
     db.cursor().execute("CREATE TABLE IF NOT EXISTS RECORDS (day TEXT NOT NULL,timestamp INTEGER NOT NULL,trainCodeA TEXT,trainCodeB TEXT,carA TEXT,carB TEXT)")
     db.commit()
@@ -78,6 +75,12 @@ def findRunTrains(day=0):
         dba = sqlite3.connect("./records.db")
         codeFull = ""
         tsfirst = -1
+        im = dba.cursor().execute("SELECT * FROM RECORDS WHERE day=? AND trainCodeA=? OR trainCodeB=?",
+                                  (formatTime(-day), i[0], i[0]))
+        if len(list(im)) > 0 and day != 0:
+            # 重复车次
+            return
+        
         for x in range(5):
             try:
                 r2 = requests.post("https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo", data={
@@ -100,13 +103,8 @@ def findRunTrains(day=0):
                 return
         i = codeFull.split("/")
         try:
-            im = dba.cursor().execute("SELECT * FROM RECORDS WHERE day=? AND trainCodeA=?",
-                                      (formatTime(-day), i[0]))
-            if len(list(im)) > 0:
-                # 重复车次
-                return
-            d = json.loads(c.postForm(
-                "com.cars.otsmobile.homepage.getTrainInfoImg",
+            d = json.loads(postM(
+                "homepage.getTrainInfoImg",
                 {
                     "startTrainDate": formatTime(-day),
                     "trainCode": i[0],
@@ -114,9 +112,7 @@ def findRunTrains(day=0):
                 }
             ))
             if d["isHaveData"] == "Y":
-                r = []
-                for x in d["trainInfo"]:
-                    r.append(fixTrainset(x["trainsetName"]))
+                r = [fixTrainset(x["trainsetName"]) for x in d["trainInfo"]]
                 dba.cursor().execute(
                     "INSERT INTO RECORDS (day,timestamp,trainCodeA,trainCodeB,carA,carB) VALUES (?,?,?,?,?,?)",
                     (formatTime(-day),
