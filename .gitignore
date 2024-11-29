@@ -164,3 +164,4 @@ cython_debug/
 # Test database
 records.db
 records.db-journal
+cr-emu.log

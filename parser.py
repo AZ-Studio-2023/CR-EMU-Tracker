@@ -16,10 +16,13 @@ from concurrent.futures import ThreadPoolExecutor
 UNIQUE = []
 commits = 0
 
-logging.basicConfig(
-    format="%(asctime)s [%(levelname)s] %(message)s", filename="cr-emu.log")
+logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("TrainTrack")
 logger.setLevel(logging.DEBUG)
+
+_fh = logging.FileHandler("cr-emu.log")
+_fh.setLevel(logging.DEBUG)
+logger.addHandler(_fh)
 
 
 def formatTime(offset=0):
@@ -77,7 +80,7 @@ def findRunTrains(day=0):
         tsfirst = -1
         im = dba.cursor().execute("SELECT * FROM RECORDS WHERE day=? AND trainCodeA=? OR trainCodeB=?",
                                   (formatTime(-day), i[0], i[0]))
-        if len(list(im)) > 0 and day != 0:
+        if len(list(im)) > 0:
             # 重复车次
             return
         
@@ -103,14 +106,14 @@ def findRunTrains(day=0):
                 return
         i = codeFull.split("/")
         try:
-            d = json.loads(postM(
+            d = mpaas.postM(
                 "homepage.getTrainInfoImg",
                 {
                     "startTrainDate": formatTime(-day),
                     "trainCode": i[0],
                     "trainSetName": ""
                 }
-            ))
+            )
             if d["isHaveData"] == "Y":
                 r = [fixTrainset(x["trainsetName"]) for x in d["trainInfo"]]
                 dba.cursor().execute(
