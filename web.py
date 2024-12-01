@@ -1,5 +1,5 @@
 from flask import *
-import sqlite3
+import pymysql
 import time
 
 app = Flask("TrainTrack")
@@ -7,6 +7,17 @@ app = Flask("TrainTrack")
 start_time = time.time()
 visit_count = 0
 query_count = 0
+
+
+# MySQL 数据库连接
+def connect_mysql():
+    return pymysql.connect(
+        host="localhost",
+        user="root",
+        password="123456",
+        database="traintrack"
+    )
+
 
 def detectType(kw):
     if kw.startswith("G") or kw.startswith("D"):
@@ -35,6 +46,7 @@ def faqpage():
     visit_count += 1
     return render_template("faq.html")
 
+
 @app.route("/docs")
 def docpage():
     global visit_count
@@ -45,32 +57,31 @@ def docpage():
 @app.route("/api/query")
 def query():
     global query_count
-    query_count+=1
+    query_count += 1
     qn = request.values.get("keyword", None)
-    a_and_b = request.values.get("a_and_b", None)
     if qn is None:
         return jsonify({
             "success": False,
             "data": []
         })
 
-    d = sqlite3.connect("./records.db")
+    conn = connect_mysql()  # 连接 MySQL
+    cursor = conn.cursor()
     s = None
     k = detectType(qn)
     if k == "train":
-        s = d.cursor().execute(
-            "SELECT * FROM RECORDS WHERE trainCodeA=? OR trainCodeB=? ORDER BY timestamp DESC LIMIT 50", (qn, qn))
+        cursor.execute(
+            "SELECT * FROM RECORDS WHERE trainCodeA=%s OR trainCodeB=%s ORDER BY timestamp DESC LIMIT 50", (qn, qn))
     elif k == "car":
-        s = d.cursor().execute(
-            "SELECT * FROM RECORDS WHERE carA LIKE '%s%%' OR carB LIKE '%s%%' ORDER BY timestamp DESC LIMIT 50"%(qn, qn))
+        cursor.execute(
+            "SELECT * FROM RECORDS WHERE carA LIKE %s OR carB LIKE %s ORDER BY timestamp DESC LIMIT 50", (f"{qn}%", f"{qn}%"))
     else:
         return jsonify({
             "success": True,
             "data": []
         })
-    d.commit()
-
-    res = s.fetchall()
+    res = cursor.fetchall()
+    conn.close()
 
     if len(res) == 0:
         return jsonify({
@@ -78,25 +89,15 @@ def query():
             "data": []
         })
 
-    if a_and_b == "true":
-        data = list(reversed(sorted([{
-                "runDate": time.strftime('%Y-%m-%d %H:%M', time.localtime(x[1])),
-                "trainNumA": f"{x[2]}",
-                "trainNumB": f"{x[3]}" if x[3] != "" else None,
-                "trainCodeA": f"{x[4]}",
-                "trainCodeB": f"{x[5]}" if x[5] != "" else None
-            } for x in res], key=lambda a: time.mktime(time.strptime(a["runDate"], '%Y-%m-%d %H:%M')))))
-    else:
-        data = list(reversed(sorted([{
-                "runDate": time.strftime('%Y-%m-%d %H:%M', time.localtime(x[1])),
-                "trainNum": f"{x[2]}/{x[3]}" if x[3] != "" else x[2],
-                "trainCode": f"{x[4]} + {x[5]}" if x[5] != "" else x[4]
-            } for x in res], key=lambda a: time.mktime(time.strptime(a["runDate"], '%Y-%m-%d %H:%M')))))
-
     return jsonify({
         "success": True,
-        "data": data
+        "data": list(reversed(sorted([{
+            "runDate": time.strftime('%Y-%m-%d %H:%M', time.localtime(x[1])),
+            "trainNum": f"{x[2]}/{x[3]}" if x[3] != "" else x[2],
+            "trainCode": f"{x[4]} + {x[5]}" if x[5] != "" else x[4]
+        } for x in res], key=lambda a: time.mktime(time.strptime(a["runDate"], '%Y-%m-%d %H:%M')))))
     })
+
 
 @app.route("/api/stats")
 def get_stats():
@@ -109,6 +110,7 @@ def get_stats():
         "visits": visit_count,
         "queries": query_count
     })
+
 
 if __name__ == "__main__":
     app.run("0.0.0.0", 80, debug=True)

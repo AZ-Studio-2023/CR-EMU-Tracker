@@ -8,7 +8,9 @@ import requests
 import datetime
 import mpaas
 import time
-import sqlite3
+import pymysql
+from pathlib import Path
+import os
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -25,8 +27,18 @@ _fh.setLevel(logging.DEBUG)
 logger.addHandler(_fh)
 
 
+# MySQL 数据库连接
+def connect_mysql():
+    return pymysql.connect(
+        host="localhost",
+        user="root",
+        password="123456",
+        database="traintrack"
+    )
+
+
 def formatTime(offset=0):
-    return (datetime.datetime.utcnow()+datetime.timedelta(hours=8)-datetime.timedelta(days=offset)).strftime('%Y%m%d')
+    return (datetime.datetime.utcnow() + datetime.timedelta(hours=8) - datetime.timedelta(days=offset)).strftime('%Y%m%d')
 
 
 def deformatTime(ts):
@@ -59,31 +71,36 @@ def getTrainList(day=0):
                     time.sleep(20)
                     continue
 
-    # raise ConnectionError
-
 
 def findRunTrains(day=0):
     global UNIQUE, commits
-    db = sqlite3.connect("./records.db")
-
-    db.cursor().execute("CREATE TABLE IF NOT EXISTS RECORDS (day TEXT NOT NULL,timestamp INTEGER NOT NULL,trainCodeA TEXT,trainCodeB TEXT,carA TEXT,carB TEXT)")
-    db.commit()
-
-    db.cursor().execute("PRAGMA synchronous = OFF")
-    db.commit()
+    conn = connect_mysql()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS RECORDS (
+            day VARCHAR(10) NOT NULL,
+            timestamp BIGINT NOT NULL,
+            trainCodeA VARCHAR(50),
+            trainCodeB VARCHAR(50),
+            carA VARCHAR(50),
+            carB VARCHAR(50)
+        )
+    """)
+    conn.commit()
     logger.info("开始")
 
     def parseTrainJL(i):
         global UNIQUE, commits
-        dba = sqlite3.connect("./records.db")
+        conn = connect_mysql()
+        cursor = conn.cursor()
         codeFull = ""
         tsfirst = -1
-        # im = dba.cursor().execute("SELECT * FROM RECORDS WHERE day=? AND trainCodeA=? OR trainCodeB=?",
-        #                           (formatTime(-day), i[0], i[0]))
-        # if len(list(im)) > 0:
-        #     # 重复车次
-        #     return
-        
+        cursor.execute("SELECT * FROM RECORDS WHERE day=%s AND trainCodeA=%s OR trainCodeB=%s",
+                       (formatTime(-day), i[0], i[0]))
+        if len(list(cursor)) > 0:
+            # 重复车次
+            return
+
         for x in range(5):
             try:
                 r2 = requests.post("https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo", data={
@@ -116,8 +133,8 @@ def findRunTrains(day=0):
             )
             if d["isHaveData"] == "Y":
                 r = [fixTrainset(x["trainsetName"]) for x in d["trainInfo"]]
-                dba.cursor().execute(
-                    "INSERT INTO RECORDS (day,timestamp,trainCodeA,trainCodeB,carA,carB) VALUES (?,?,?,?,?,?)",
+                cursor.execute(
+                    "INSERT INTO RECORDS (day, timestamp, trainCodeA, trainCodeB, carA, carB) VALUES (%s, %s, %s, %s, %s, %s)",
                     (formatTime(-day),
                      tsfirst,
                      i[0],
@@ -126,7 +143,7 @@ def findRunTrains(day=0):
                      r[1] if len(r) > 1 else "")
                 )
                 logger.info(f"车次{i[0]} 编组{' + '.join(r)}")
-                dba.commit()
+                conn.commit()
                 commits += 1
         except Exception as e:
             logger.exception(e)
@@ -139,12 +156,14 @@ def findRunTrains(day=0):
     logger.info(f"爬取完成 耗时{time.time()-ta}s 提交{commits}条记录")
 
     if day == 0:
-        db.cursor().execute("DELETE FROM RECORDS WHERE day<?", (formatTime(60),))
-        db.commit()
+        cursor.execute("DELETE FROM RECORDS WHERE day < %s", (formatTime(60),))
+        conn.commit()
         logger.info("清除完成60天前数据")
 
 
 if __name__ == "__main__":
+    current_dir = Path(__file__).resolve().parent
+    os.chdir(current_dir)
     logger.info("====CR-TRACKER====")
     logger.info("开始爬取：今天和五天后数据")
     findRunTrains(0)
