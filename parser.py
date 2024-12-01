@@ -78,9 +78,11 @@ def findRunTrains(day=0):
         dba = sqlite3.connect("./records.db")
         codeFull = ""
         tsfirst = -1
-        im = dba.cursor().execute("SELECT * FROM RECORDS WHERE day=? AND trainCodeA=? OR trainCodeB=?",
-                                  (formatTime(-day), i[0], i[0]))
-        if len(list(im)) > 0:
+        exists = dba.cursor().execute(
+            "SELECT EXISTS(SELECT 1 FROM RECORDS WHERE day=? AND (trainCodeA=? OR trainCodeB=?))",
+            (formatTime(-day), i[0], i[0])
+        ).fetchone()[0]
+        if exists:
             # 重复车次
             return
         
