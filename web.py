@@ -47,6 +47,7 @@ def query():
     global query_count
     query_count+=1
     qn = request.values.get("keyword", None)
+    a_and_b = request.values.get("a_and_b", None)
     if qn is None:
         return jsonify({
             "success": False,
@@ -77,13 +78,24 @@ def query():
             "data": []
         })
 
+    if a_and_b == "true":
+        data = list(reversed(sorted([{
+                "runDate": time.strftime('%Y-%m-%d %H:%M', time.localtime(x[1])),
+                "trainNumA": f"{x[2]}",
+                "trainNumB": f"{x[3]}" if x[3] != "" else None,
+                "trainCodeA": f"{x[4]}",
+                "trainCodeB": f"{x[5]}" if x[5] != "" else None
+            } for x in res], key=lambda a: time.mktime(time.strptime(a["runDate"], '%Y-%m-%d %H:%M')))))
+    else:
+        data = list(reversed(sorted([{
+                "runDate": time.strftime('%Y-%m-%d %H:%M', time.localtime(x[1])),
+                "trainNum": f"{x[2]}/{x[3]}" if x[3] != "" else x[2],
+                "trainCode": f"{x[4]} + {x[5]}" if x[5] != "" else x[4]
+            } for x in res], key=lambda a: time.mktime(time.strptime(a["runDate"], '%Y-%m-%d %H:%M')))))
+
     return jsonify({
         "success": True,
-        "data": list(reversed(sorted([{
-            "runDate": time.strftime('%Y-%m-%d %H:%M', time.localtime(x[1])),
-            "trainNum": f"{x[2]}/{x[3]}" if x[3] != "" else x[2],
-            "trainCode": f"{x[4]} + {x[5]}" if x[5] != "" else x[4]
-        } for x in res], key=lambda a: time.mktime(time.strptime(a["runDate"], '%Y-%m-%d %H:%M')))))
+        "data": data
     })
 
 @app.route("/api/stats")
