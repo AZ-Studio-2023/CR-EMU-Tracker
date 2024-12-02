@@ -149,12 +149,10 @@ def findRunTrains(day=0):
         except Exception as e:
             logger.exception(e)
 
-    ta = time.time()
     with ThreadPoolExecutor(8) as tp:
         for i in getTrainList(day):
             tp.submit(parseTrainJL, i)
-
-    logger.info(f"爬取完成 耗时{time.time()-ta}s 提交{commits}条记录")
+    logger.info(f"{new_date.strftime('%Y-%m-%d')}爬取完成")
 
     if day == 0:
         cursor.execute("DELETE FROM RECORDS WHERE day < %s", (formatTime(60),))
@@ -167,6 +165,7 @@ if __name__ == "__main__":
     os.chdir(current_dir)
     logger.info("====CR-TRACKER====")
     logger.info("开始爬取：今天和五天后数据")
+    ta = time.time()
     findRunTrains(0)
     findRunTrains(5)
-    logger.info("完成")
+    logger.info(f"任务完成，共耗时{time.time()-ta}s，共计提交{commits}条数据")
