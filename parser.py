@@ -88,7 +88,7 @@ def findRunTrains(day=0):
     """)
     conn.commit()
     logger.info("开始")
-    today = datetime.today()
+    today = datetime.datetime.today()
     new_date = today + datetime.timedelta(days=day)
 
     def parseTrainJL(i):
@@ -99,7 +99,7 @@ def findRunTrains(day=0):
         tsfirst = -1
         cursor.execute("SELECT COUNT(*) FROM RECORDS WHERE trainCodeA=%s AND day=%s", (i, formatTime(-day)))
         if cursor.fetchone()[0] > 0:
-            logger.info(f"车次 {i} 在 {new_date.strftime("%Y-%m-%d")} 已存在，跳过")
+            logger.info(f"车次 {i} 在 {new_date.strftime('%Y-%m-%d')} 已存在，跳过")
             return
 
         for x in range(5):
@@ -120,7 +120,7 @@ def findRunTrains(day=0):
                 UNIQUE += codeFull.split("/")
                 break
             except:
-                logger.info(f"{i} 在 {new_date.strftime("%Y-%m-%d")} 不跑")
+                logger.info(f"{i} 在 {new_date.strftime('%Y-%m-%d')} 不跑")
                 return
         i = codeFull.split("/")
         try:
