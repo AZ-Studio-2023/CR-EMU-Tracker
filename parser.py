@@ -120,7 +120,7 @@ def findRunTrains(day=0):
                 UNIQUE += codeFull.split("/")
                 break
             except:
-                logger.info(f"{i} 今天不跑")
+                logger.info(f"{i} 在 {new_date.strftime("%Y-%m-%d")} 不跑")
                 return
         i = codeFull.split("/")
         try:
