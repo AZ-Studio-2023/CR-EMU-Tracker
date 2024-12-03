@@ -18,6 +18,26 @@
             font-family: "Noto Sans CJK SC";
             font-weight: normal;
         }
+
+        /* 添加进度条动画 */
+        @keyframes loading {
+            0% {
+                width: 0;
+                margin-left: 0;
+            }
+            50% {
+                width: 50%;
+                margin-left: 25%;
+            }
+            100% {
+                width: 0;
+                margin-left: 100%;
+            }
+        }
+
+        .animate-loading {
+            animation: loading 1.5s infinite ease-in-out;
+        }
     </style>
 </head>
 
@@ -236,6 +256,13 @@
                 return;
             }
 
+            // 显示进度条
+            $("#loading-bar").removeClass("hidden");
+            
+            // 禁用查询按钮
+            $("#search-history-trigger").prop("disabled", true);
+            $("#search-history-trigger").addClass("opacity-50 cursor-not-allowed");
+
             $.ajax({
                 url: "/api/query",
                 method: "GET",
@@ -259,7 +286,15 @@
                 error: () => {
                     showAlert("网络错误，请稍后再试", "error");
                 },
-                timeout: 3000
+                timeout: 3000,
+                complete: () => {
+                    // 隐藏进度条
+                    $("#loading-bar").addClass("hidden");
+                    
+                    // 启用查询按钮
+                    $("#search-history-trigger").prop("disabled", false);
+                    $("#search-history-trigger").removeClass("opacity-50 cursor-not-allowed");
+                }
             })
         });
 
