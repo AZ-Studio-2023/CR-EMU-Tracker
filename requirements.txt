@@ -1,0 +1,5 @@
+flask
+pycryptodome
+aiohttp
+aiomysql
+aiohttp[speedups]
