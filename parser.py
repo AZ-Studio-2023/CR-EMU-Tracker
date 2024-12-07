@@ -162,10 +162,19 @@ def findRunTrains(day=0):
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d","--day", help="爬取的日期（0为今天，5为未来第5天）",type=int)
+    args = parser.parse_args()
+
     current_dir = Path(__file__).resolve().parent
     os.chdir(current_dir)
+
+    if args.day<0 or args.day>10:
+        print("ERROR: 超出可接受的数值范围")
+        exit()
+
     logger.info("====CR-TRACKER====")
-    logger.info("开始爬取：今天和五天后数据")
-    findRunTrains(0)
-    findRunTrains(5)
+    logger.info(f"开始爬取：第{args.day}天数据")
+    findRunTrains(args.day)
     logger.info("完成")

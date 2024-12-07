@@ -57,7 +57,6 @@ def docpage():
 @app.route("/api/query")
 def query():
     global query_count
-    query_count += 1
     qn = request.values.get("keyword", None)
     if qn is None:
         return jsonify({
@@ -69,6 +68,7 @@ def query():
     cursor = conn.cursor()
     s = None
     k = detectType(qn)
+    query_count += 1
     if k == "train":
         cursor.execute(
             "SELECT * FROM RECORDS WHERE trainCodeA=%s OR trainCodeB=%s ORDER BY timestamp DESC LIMIT 50", (qn, qn))
