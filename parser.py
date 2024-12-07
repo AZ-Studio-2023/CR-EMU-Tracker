@@ -88,6 +88,8 @@ def findRunTrains(day=0):
     """)
     conn.commit()
     logger.info("开始")
+    today = datetime.datetime.today()
+    new_date = today + datetime.timedelta(days=day)
 
     def parseTrainJL(i):
         global UNIQUE, commits
@@ -95,10 +97,9 @@ def findRunTrains(day=0):
         cursor = conn.cursor()
         codeFull = ""
         tsfirst = -1
-        cursor.execute("SELECT * FROM RECORDS WHERE day=%s AND trainCodeA=%s OR trainCodeB=%s",
-                       (formatTime(-day), i[0], i[0]))
-        if len(list(cursor)) > 0:
-            # 重复车次
+        cursor.execute("SELECT COUNT(*) FROM RECORDS WHERE trainCodeA=%s AND day=%s", (i, formatTime(-day)))
+        if cursor.fetchone()[0] > 0:
+            logger.info(f"车次 {i} 在 {new_date.strftime('%Y-%m-%d')} 已存在，跳过")
             return
 
         for x in range(5):
@@ -119,7 +120,7 @@ def findRunTrains(day=0):
                 UNIQUE += codeFull.split("/")
                 break
             except:
-                logger.info(f"{i} 今天不跑")
+                logger.info(f"{i} 在 {new_date.strftime('%Y-%m-%d')} 不跑")
                 return
         i = codeFull.split("/")
         try:
@@ -148,12 +149,10 @@ def findRunTrains(day=0):
         except Exception as e:
             logger.exception(e)
 
-    ta = time.time()
     with ThreadPoolExecutor(8) as tp:
         for i in getTrainList(day):
             tp.submit(parseTrainJL, i)
-
-    logger.info(f"爬取完成 耗时{time.time()-ta}s 提交{commits}条记录")
+    logger.info(f"{new_date.strftime('%Y-%m-%d')}爬取完成")
 
     if day == 0:
         cursor.execute("DELETE FROM RECORDS WHERE day < %s", (formatTime(60),))
@@ -175,6 +174,7 @@ if __name__ == "__main__":
         exit()
 
     logger.info("====CR-TRACKER====")
-    logger.info(f"开始爬取：第{args.day}天数据")
-    findRunTrains(args.day)
+    logger.info("开始爬取：今天和五天后数据")
+    findRunTrains(0)
+    findRunTrains(5)
     logger.info("完成")
