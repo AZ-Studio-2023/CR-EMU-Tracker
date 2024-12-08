@@ -213,7 +213,8 @@ if __name__ == "__main__":
 
     async def main():
         await init_mysql_pool()
-        async with aiohttp.ClientSession() as client:
+        connector = aiohttp.TCPConnector(ssl=False)
+        async with aiohttp.ClientSession(connector=connector) as client:
             await findRunTrains(client, args.day)
         mysql_pool.close()
         await mysql_pool.wait_closed()
