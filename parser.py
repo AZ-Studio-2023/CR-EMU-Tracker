@@ -1,6 +1,6 @@
 '''
-    2024-11-01
-    TrackTrain v1
+    2024-12-14
+    TrackTrain v2
     动车组担当查询
     by TKP30
 '''
@@ -13,10 +13,10 @@ from pathlib import Path
 import os
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 
 UNIQUE = []
-commits = 0
+COMMITS = 0
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("TrainTrack")
@@ -25,6 +25,8 @@ logger.setLevel(logging.DEBUG)
 _fh = logging.FileHandler("cr-emu.log")
 _fh.setLevel(logging.DEBUG)
 logger.addHandler(_fh)
+
+requests.packages.urllib3.disable_warnings()
 
 
 # MySQL 数据库连接
@@ -57,23 +59,26 @@ def getTrainList(day=0):
             for x in range(5):
                 try:
                     req = requests.get(
-                        f"https://search.12306.cn/search/v1/h5/search?keyword={key+str(tn)}")
+                        f"https://search.12306.cn/search/v1/h5/search?keyword={key+str(tn)}", verify=False)
                     jr = req.json()
+                    cnt = 0
                     for car in jr["data"]:
-                        if car["params"]["station_train_code"] in UNIQUE or car["type"] != "001":
+                        if car["params"]["train_no"] in UNIQUE or car["type"] != "001":
                             continue
+                        UNIQUE.append(car["params"]["train_no"])
+                        cnt += 1
                         yield car["params"]["station_train_code"]
-                    logger.info(f"{key}{tn} 号段搜索好")
+                    logger.info(f"{key}{tn} 号段搜索好，共 {cnt} 个车次")
+                    time.sleep(0.1)
                     break
                 except Exception as e:
                     logger.info(f"{key}{tn} 号段限速")
-                    # logger.exception(e)
                     time.sleep(20)
                     continue
 
 
 def findRunTrains(day=0):
-    global UNIQUE, commits
+    global UNIQUE, COMMITS
     conn = connect_mysql()
     cursor = conn.cursor()
     cursor.execute("""
@@ -87,72 +92,77 @@ def findRunTrains(day=0):
         )
     """)
     conn.commit()
-    logger.info("开始")
+    logger.info("数据库初始化完成，启动主循环")
     today = datetime.datetime.today()
     new_date = today + datetime.timedelta(days=day)
 
     def parseTrainJL(i):
-        global UNIQUE, commits
+        global UNIQUE, COMMITS
         conn = connect_mysql()
         cursor = conn.cursor()
         codeFull = ""
         tsfirst = -1
-        cursor.execute("SELECT COUNT(*) FROM RECORDS WHERE trainCodeA=%s AND day=%s", (i, formatTime(-day)))
+        
+        cursor.execute(
+            "SELECT COUNT(*) FROM RECORDS WHERE trainCodeA=%s AND day=%s", (i, formatTime(-day)))
         if cursor.fetchone()[0] > 0:
-            logger.info(f"车次 {i} 在 {new_date.strftime('%Y-%m-%d')} 已存在，跳过")
-            return
+            logger.info(f"车次 {i} 在 {new_date.strftime('%Y-%m-%d')} 已存在，移除数据")
+            cursor.execute(
+                "DELETE FROM RECORDS WHERE trainCodeA=%s AND day=%s", (i, formatTime(-day)))
 
         for x in range(5):
             try:
                 r2 = requests.post("https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo", data={
                     "trainCode": i,
                     "startDay": formatTime(-day)
-                })
+                }, verify=False)
             except:
                 continue
             try:
                 codeFull = r2.json()[
                     "data"]["trainDetail"]["stationTrainCodeAll"]
-                if codeFull.split("/")[0] in UNIQUE:
-                    return
                 tsfirst = deformatTime(
                     formatTime(-day)+r2.json()["data"]["startTime"])
-                UNIQUE += codeFull.split("/")
                 break
             except:
-                logger.info(f"{i} 在 {new_date.strftime('%Y-%m-%d')} 不跑")
+                logger.info(f"车次 {i} 在 {new_date.strftime('%Y-%m-%d')} 不跑")
                 return
         i = codeFull.split("/")
-        try:
-            d = mpaas.postM(
-                "homepage.getTrainInfoImg",
-                {
-                    "startTrainDate": formatTime(-day),
-                    "trainCode": i[0],
-                    "trainSetName": ""
-                }
-            )
-            if d["isHaveData"] == "Y":
-                r = [fixTrainset(x["trainsetName"]) for x in d["trainInfo"]]
-                cursor.execute(
-                    "INSERT INTO RECORDS (day, timestamp, trainCodeA, trainCodeB, carA, carB) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (formatTime(-day),
-                     tsfirst,
-                     i[0],
-                     i[1] if len(i) > 1 else "",
-                     r[0],
-                     r[1] if len(r) > 1 else "")
+        for _ in range(3):
+            try:
+                d = mpaas.postM(
+                    "homepage.getTrainInfoImg",
+                    {
+                        "startTrainDate": formatTime(-day),
+                        "trainCode": i[0],
+                        "trainSetName": ""
+                    }
                 )
-                logger.info(f"车次{i[0]} 编组{' + '.join(r)}")
-                conn.commit()
-                commits += 1
-        except Exception as e:
-            logger.exception(e)
+                if d["isHaveData"] == "Y":
+                    r = [fixTrainset(x["trainsetName"])
+                         for x in d["trainInfo"]]
+                    cursor.execute(
+                        "INSERT INTO RECORDS (day, timestamp, trainCodeA, trainCodeB, carA, carB) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (formatTime(-day),
+                         tsfirst,
+                         i[0],
+                         i[1] if len(i) > 1 else "",
+                         r[0],
+                         r[1] if len(r) > 1 else "")
+                    )
+                    logger.info(f"车次 {i[0]} 编组 {' + '.join(r)}")
+                    conn.commit()
+                    COMMITS += 1
+                    time.sleep(0.25)
+                    return
+            except Exception as e:
+                time.sleep(0.1)
 
-    with ThreadPoolExecutor(8) as tp:
-        for i in getTrainList(day):
-            tp.submit(parseTrainJL, i)
-    logger.info(f"{new_date.strftime('%Y-%m-%d')}爬取完成")
+        logger.info(f"车次 {i[0]} 无数据")
+
+    with ThreadPoolExecutor(30) as tp:
+        tp.map(parseTrainJL, getTrainList(day))
+    logger.info(f"{new_date.strftime('%Y-%m-%d')} 爬取完成")
 
     if day == 0:
         cursor.execute("DELETE FROM RECORDS WHERE day < %s", (formatTime(60),))
@@ -163,18 +173,17 @@ def findRunTrains(day=0):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d","--day", help="爬取的日期（0为今天，5为未来第5天）",type=int)
+    parser.add_argument(
+        "-d", "--day", help="爬取的日期（0为今天，5为未来第5天）", type=int, default=0)
     args = parser.parse_args()
 
     current_dir = Path(__file__).resolve().parent
     os.chdir(current_dir)
 
-    if args.day<0 or args.day>10:
+    if args.day < 0 or args.day > 10:
         print("ERROR: 超出可接受的数值范围")
         exit()
 
     logger.info("====CR-TRACKER====")
-    logger.info("开始爬取：今天和五天后数据")
-    findRunTrains(0)
-    findRunTrains(5)
-    logger.info("完成")
+    logger.info(f"开始爬取：{args.day}天数据")
+    findRunTrains(args.day)
