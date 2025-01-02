@@ -376,7 +376,7 @@
         });
 
         $(document).ready(function() {
-            $.getJSON("https://json.zenglingkun.cn/EMU/announcement.json", function(data) {
+            $.getJSON("https://json.zenglingkun.cn/EMU/announcement.json?" + new Date().getTime(), function(data) {
                 let announcements = data;
                 let currentAnnouncement = 0;
                 let displayAnnouncement = function() {
@@ -389,7 +389,7 @@
                             currentAnnouncement = (currentAnnouncement + 1) % announcements.length;
                             displayAnnouncement();
                         }, displayTime);
-                    }, 500); // 等待动画完成
+                    }, 500);
                 };
                 displayAnnouncement();
             });
