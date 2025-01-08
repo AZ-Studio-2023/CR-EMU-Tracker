@@ -6,7 +6,7 @@
 '''
 import requests
 import datetime
-import mpaas
+from mpaas import postM
 import time
 import pymysql
 from pathlib import Path
@@ -110,27 +110,38 @@ def findRunTrains(day=0):
             cursor.execute(
                 "DELETE FROM RECORDS WHERE trainCodeA=%s AND day=%s", (i, formatTime(-day)))
 
-        for x in range(5):
+        for _ in range(5):
             try:
-                r2 = requests.post("https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo", data={
-                    "trainCode": i,
-                    "startDay": formatTime(-day)
-                }, verify=False)
+                r2 = postM("trainTimeTable.queryTrainAllInfo",
+                           {
+                               "fromStation": "",
+                               "toStation": "",
+                               "trainCode": i,
+                               "trainType": "",
+                               "trainDate": formatTime(-day)
+                           }
+                           )
+                crj = json.loads(r2["trainData"])
             except:
                 continue
             try:
-                codeFull = r2.json()[
-                    "data"]["trainDetail"]["stationTrainCodeAll"]
                 tsfirst = deformatTime(
-                    formatTime(-day)+r2.json()["data"]["startTime"])
+                    r2["startDate"]+r2["train"]["start_time"])
+                i = set()
+                for x in crj["stopTime"]:
+                    try:
+                        i.add(x["dispTrainCode"])
+                    except:
+                        continue
                 break
-            except:
-                logger.info(f"车次 {i} 在 {new_date.strftime('%Y-%m-%d')} 不跑")
+            except Exception as e:
+                print(e)
+                logger.info(f"车次 {i[0]} 在 {new_date.strftime('%Y-%m-%d')} 不跑")
                 return
-        i = codeFull.split("/")
+        i = list(i)
         for _ in range(3):
             try:
-                d = mpaas.postM(
+                d = postM(
                     "homepage.getTrainInfoImg",
                     {
                         "startTrainDate": formatTime(-day),
