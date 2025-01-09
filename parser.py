@@ -7,6 +7,7 @@
 import requests
 import datetime
 import time
+import sys
 import pymysql
 from dbutils.pooled_db import PooledDB
 from pathlib import Path
@@ -15,11 +16,14 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from mpaas import postM
+import tqdm
+import tqdm_logging_wrapper as tqdl
 
 # 全局变量
 UNIQUE = set()
 COMMITS = 0
-DAY = None
+DAY = 0
+PBAR = None
 
 # 日志配置
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s")
@@ -68,6 +72,7 @@ def fix_trainset(tsn):
 
 
 def get_train_list(day=0):
+    global PBAR
     for key in ["D", "G", "C"]:
         for tn in range(1, 100):
             for _ in range(5):
@@ -81,6 +86,7 @@ def get_train_list(day=0):
                             continue
                         UNIQUE.add(car["params"]["train_no"])
                         cnt += 1
+                        PBAR.total += 1
                         yield car["params"]["station_train_code"]
                     logger.info(f"{key}{tn} 号段搜索好，共 {cnt} 个车次")
                     time.sleep(0.1)
@@ -92,7 +98,7 @@ def get_train_list(day=0):
 
 
 def parse_train_jl(train_code):
-    global UNIQUE, COMMITS, DAY
+    global UNIQUE, COMMITS, DAY, PBAR
     conn = get_db_connection()
     cursor = conn.cursor()
     day = DAY
@@ -116,16 +122,18 @@ def parse_train_jl(train_code):
             })
             crj = json.loads(r2["trainData"])
             tsfirst = deformat_time(
-                r2["startDate"] + r2["train"]["start_time"])
+                format_time(-day) + r2["train"]["start_time"])
             i = {x["dispTrainCode"]
                  for x in crj["stopTime"] if "dispTrainCode" in x}
             break
         except Exception as e:
             logger.info(f"车次 {train_code} 当天不开行")
+            PBAR.update()
             return
 
     if not i:
         logger.info(f"车次 {train_code} 无停靠数据")
+        PBAR.update()
         return
 
     for _ in range(3):
@@ -146,6 +154,7 @@ def parse_train_jl(train_code):
                 conn.close()
                 logger.info(f"车次 {train_code} 编组 {'+'.join(r)}")
                 COMMITS += 1
+                PBAR.update()
                 time.sleep(0.05)
                 return
         except Exception as e:
@@ -154,9 +163,11 @@ def parse_train_jl(train_code):
 
 
 def find_run_trains(day=0):
-    global UNIQUE, COMMITS, DAY
+    global UNIQUE, COMMITS, DAY, PBAR
     conn = get_db_connection()
     DAY = day
+    PBAR = tqdm.tqdm(total=0, desc="遍历车次", unit="组",
+                     position=0, file=sys.stdout)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS RECORDS (
@@ -169,12 +180,14 @@ def find_run_trains(day=0):
         )""")
     conn.commit()
     logger.info("数据库初始化完成，启动主循环")
-    new_date = datetime.datetime.today() + datetime.timedelta(days=day)
 
     with ThreadPoolExecutor(30) as executor:
-        executor.map(parse_train_jl, get_train_list(day))
+        with tqdl.wrap_logging_for_tqdm(PBAR, logger=logger):
+            executor.map(parse_train_jl, get_train_list(day))
 
-    logger.info(f"{new_date.strftime('%Y-%m-%d')} 爬取完成")
+    PBAR.close()
+
+    logger.info(f"{format_time(-day)} 爬取完成")
     logger.info(f"提交了 {COMMITS} 行记录")
 
     if day == 0:

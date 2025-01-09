@@ -9,15 +9,12 @@
 
 ## 特点
 - **可查询未来车次的担当信息。**
-- (理论) 无需维护车辆列表，自动适应。
+- 无需维护车辆列表，自动适应。
 - 采用多线程结构，爬取快速。
 - 轻量简便，300行 (`parser.py`) 解决一切问题。
 
 ## 运行
-
-`pip install -r requirements.txt`
-
-启动爬虫：`python parser.py --day {需要获取的未来天}`
+https://github.com/AZ-Studio-2023/CR-EMU-Tracker/wiki/%E8%87%AA%E6%9C%89%E9%83%A8%E7%BD%B2%E6%8C%87%E5%8D%97
 
 ## 服务
 https://crtracker.azteam.cn/

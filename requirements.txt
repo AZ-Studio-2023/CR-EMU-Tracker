@@ -3,3 +3,5 @@ pymysql
 requests
 pycryptodome
 dbutils
+tqdm
+tqdm-logging-wrapper

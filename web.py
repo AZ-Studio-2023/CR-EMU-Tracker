@@ -1,4 +1,5 @@
 from flask import *
+import datetime
 import pymysql
 import time
 
@@ -58,6 +59,12 @@ def docpage():
 def query():
     global query_count
     qn = request.values.get("keyword", None)
+    ftflag = request.values.get("future", False)
+    if str(ftflag).lower() in ["true", "1"]:
+        fd = "20991231"
+    else:
+        fd = (datetime.datetime.utcnow() +
+              datetime.timedelta(hours=8)).strftime('%Y%m%d')
     if qn is None:
         return jsonify({
             "success": False,
@@ -71,10 +78,10 @@ def query():
     query_count += 1
     if k == "train":
         cursor.execute(
-            "SELECT * FROM RECORDS WHERE trainCodeA=%s OR trainCodeB=%s ORDER BY timestamp DESC LIMIT 50", (qn, qn))
+            f"SELECT * FROM RECORDS WHERE (trainCodeA=%s OR trainCodeB=%s) AND day<{fd} ORDER BY timestamp DESC LIMIT 50", (qn, qn))
     elif k == "car":
         cursor.execute(
-            "SELECT * FROM RECORDS WHERE carA LIKE %s OR carB LIKE %s ORDER BY timestamp DESC LIMIT 50", (f"{qn}%", f"{qn}%"))
+            f"SELECT * FROM RECORDS WHERE (carA LIKE %s OR carB LIKE %s) AND day<{fd} ORDER BY timestamp DESC LIMIT 50", (f"{qn}%", f"{qn}%"))
     else:
         return jsonify({
             "success": True,
@@ -93,8 +100,8 @@ def query():
         "success": True,
         "data": list(reversed(sorted([{
             "runDate": time.strftime('%Y-%m-%d %H:%M', time.localtime(x[1])),
-            "trainNum": f"{x[2]}/{x[3]}" if x[3] != "" else x[2],
-            "trainCode": f"{x[4]} + {x[5]}" if x[5] != "" else x[4]
+            "trainNum": [x[2], x[3]] if x[3] != "" else [x[2]],
+            "trainCode": [x[4], x[5]] if x[5] != "" else [x[4]]
         } for x in res], key=lambda a: time.mktime(time.strptime(a["runDate"], '%Y-%m-%d %H:%M')))))
     })
 
