@@ -38,10 +38,12 @@
                 width: 0;
                 margin-left: 0;
             }
+
             50% {
                 width: 50%;
                 margin-left: 25%;
             }
+
             100% {
                 width: 0;
                 margin-left: 100%;
@@ -61,6 +63,7 @@
                 transform: translateY(100%);
                 opacity: 0;
             }
+
             100% {
                 transform: translateY(0);
                 opacity: 1;
@@ -72,6 +75,7 @@
                 transform: translateY(0);
                 opacity: 1;
             }
+
             100% {
                 transform: translateY(-100%);
                 opacity: 0;
@@ -79,13 +83,13 @@
         }
 
         #announcement {
-            overflow: hidden; 
+            overflow: hidden;
             height: 20px;
         }
 
         #announcement-text {
-            animation-duration: 0.5s; 
-            animation-timing-function: ease-in-out; 
+            animation-duration: 0.5s;
+            animation-timing-function: ease-in-out;
         }
     </style>
 </head>
@@ -101,9 +105,6 @@
                     <button class="md:hidden text-white focus:outline-none" id="mobile-menu-button">
                         <i class="fa fa-bars"></i>
                     </button>
-                </div>
-                <div id="announcement" class="text-white flex items-center justify-center md:flex-1">
-                    <p id="announcement-text">加载中...</p>
                 </div>
                 <div class="hidden md:flex items-center space-x-2" id="mobile-menu">
                     <a href="https://github.com/AZ-Studio-2023/CR-EMU-Tracker"
@@ -156,11 +157,9 @@
                     <i class="fa fa-info-circle text-blue-500"></i>
                 </div>
                 <div class="ml-3 flex-1">
-                    <p class="text-sm text-blue-800">
-                        本站尚在测试中，信息可能存在缺失，请综合参考。详情请看<a href="/faq"
-                            class="font-medium underline hover:text-blue-900">关于页面</a><br>
-                        每天凌晨0:02-1:42更新当天数据，该时间段内查询可能出现缺失，请谅解。
-                    </p>
+                    <div id="announcement" class="text-sm text-blue-800">
+                        <p id="announcement-text">加载中...</p>
+                    </div>
                 </div>
             </div>
 
@@ -271,45 +270,20 @@
         }
 
         function sortTable() {
-            $("#result").empty();
-            var data = JSON.parse(sessionStorage.getItem("cache"));
-            var showflag = $("#search-history-show-flag").is(":checked");
-            var k = 0;
-            if (data == undefined || data == null) {
-                $("#result").append(`<tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
-                        </tr>`);
-                return;
-            }
-            for (var i = 0; i < data.length; i++) {
-                if (!showflag && Date.now() < Date.parse(data[i].runDate)) {
-                    continue;
-                }
-                if (data[i].trainCode.split(" + ").length > 1) {
-                    $("#result").append(`<tr class="hover:bg-gray-50 transition duration-300"><td class="px-6 py-4 text-sm text-gray-500">${k + 1}</td><td class="px-6 py-4 text-sm text-gray-500">${data[i].runDate}</td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainNum.split("/")[0]}')">${data[i].trainNum}</a></td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode.split(" + ")[0]}')">${data[i].trainCode.split(" + ")[0]}</a> + <a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode.split(" + ")[1]}')">${data[i].trainCode.split(" + ")[1]}</a></td></tr>`);
-                } else {
-                    $("#result").append(`<tr class="hover:bg-gray-50 transition duration-300"><td class="px-6 py-4 text-sm text-gray-500">${k + 1}</td><td class="px-6 py-4 text-sm text-gray-500">${data[i].runDate}</td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainNum.split("/")[0]}')">${data[i].trainNum}</a></td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode}')">${data[i].trainCode}</a></td></tr>`);
-                }
-                k++;
-            }
+
         }
 
-        $("#search-history-show-flag").click((_) => {
-            sortTable();
-        });
-
-        $("#search-history-trigger").click((_) => {
-            var val = $("#search-history-kw").val();
+        function sendSearch() {
+            var val = $("#search-history-kw").val().toUpperCase();
+            var future = $("#search-history-show-flag").is(":checked");
+            $("#search-history-kw").val(val);
             if (val == "") {
                 showAlert("不能输入空值", "error");
                 return;
             }
 
             $("#loading-bar").removeClass("hidden");
-            
+
             $("#search-history-trigger").prop("disabled", true);
             $("#search-history-trigger").addClass("opacity-50 cursor-not-allowed");
 
@@ -317,21 +291,39 @@
                 url: "/api/query",
                 method: "GET",
                 data: {
-                    keyword: val
+                    keyword: val,
+                    future: future
                 },
                 success: (data) => {
                     if (!data.success) {
                         showAlert("查询失败，请确保输入正确", "error");
                         return;
                     }
-
+                    $("#result").empty();
                     if (data.success && data.data.length == 0) {
                         showAlert("未查询到数据", "warning");
+                        $("#result").append(`<tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                        </tr>`);
                         return;
                     }
-                    showAlert("查询成功","success");
-                    sessionStorage.setItem("cache", JSON.stringify(data.data));
-                    sortTable();
+                    showAlert("查询成功", "success");
+                    var k = 0;
+                    if (data.data == undefined || data.data == null || data.data.length == 0) {
+                        $("#result").append(`<tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                        </tr>`);
+                        return;
+                    }
+                    for (var i = 0; i < data.data.length; i++) {
+                        $("#result").append(`<tr class="hover:bg-gray-50 transition duration-300"><td class="px-6 py-4 text-sm text-gray-500">${i + 1}</td><td class="px-6 py-4 text-sm text-gray-500">${data.data[i].runDate}</td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data.data[i].trainNum[0]}')">${data.data[i].trainNum.join("/")}</a></td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data.data[i].trainCode[0]}')">${data.data[i].trainCode[0]}</a>${(data.data[i].trainCode.length > 1 ? ` + <a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data.data[i].trainCode[1]}')">${data.data[i].trainCode[1]}</a>` : "")}</td></tr>`);
+                    }
                 },
                 error: () => {
                     showAlert("网络错误，请稍后再试", "error");
@@ -339,16 +331,14 @@
                 timeout: 3000,
                 complete: () => {
                     $("#loading-bar").addClass("hidden");
-                    
                     $("#search-history-trigger").prop("disabled", false);
                     $("#search-history-trigger").removeClass("opacity-50 cursor-not-allowed");
                 }
             })
-        });
+        }
 
-        $(window).on("beforeunload", (_) => {
-            sessionStorage.clear();
-        });
+        $("#search-history-show-flag").click(sendSearch);
+        $("#search-history-trigger").click(sendSearch);
 
         function updateStats() {
             $.ajax({
@@ -360,32 +350,28 @@
                     );
                 }
             });
-
-            if (!sessionStorage) {
-                showAlert("您的浏览器过于陈旧，不支持本站运行需要的部分功能，请升级浏览器再试。", "error");
-            }
         }
 
         updateStats();
 
         setInterval(updateStats, 300000);
 
-        document.getElementById('mobile-menu-button').addEventListener('click', function() {
+        document.getElementById('mobile-menu-button').addEventListener('click', function () {
             const menu = document.getElementById('mobile-menu');
             menu.classList.toggle('hidden');
         });
 
-        $(document).ready(function() {
-            $.getJSON("https://json.zenglingkun.cn/EMU/announcement.json?" + new Date().getTime(), function(data) {
+        $(document).ready(function () {
+            $.getJSON("https://json.zenglingkun.cn/EMU/announcement.json?" + new Date().getTime(), function (data) {
                 let announcements = data;
                 let currentAnnouncement = 0;
-                let displayAnnouncement = function() {
+                let displayAnnouncement = function () {
                     $("#announcement-text").css('animation-name', 'slideOut');
-                    setTimeout(function() {
+                    setTimeout(function () {
                         $("#announcement-text").text(announcements[currentAnnouncement].text);
                         $("#announcement-text").css('animation-name', 'slideIn');
                         let displayTime = announcements[currentAnnouncement].time ? announcements[currentAnnouncement].time * 1000 : 5000;
-                        setTimeout(function() {
+                        setTimeout(function () {
                             currentAnnouncement = (currentAnnouncement + 1) % announcements.length;
                             displayAnnouncement();
                         }, displayTime);
