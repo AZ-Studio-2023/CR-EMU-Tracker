@@ -5,7 +5,9 @@ import time
 import gzip
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
+from retry import retry
 
+@retry(exceptions=Exception,tries=5,delay=2)
 def postM(api, form):
     """发送请求到 MpaaS 接口"""
     ts = time.strftime("%Y%m%d%H%M%S")

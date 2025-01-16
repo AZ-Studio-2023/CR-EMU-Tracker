@@ -98,69 +98,65 @@ def get_train_list(day=0):
 
 
 def parse_train_jl(train_code):
-    global UNIQUE, COMMITS, DAY, PBAR
+    global UNIQUE, COMMITS, PBAR
     conn = get_db_connection()
     cursor = conn.cursor()
-    day = DAY
+    date = datetime.datetime.utcnow() + datetime.timedelta(hours=8) - datetime.timedelta(days=DAY)
 
     cursor.execute(
-        "SELECT COUNT(*) FROM RECORDS WHERE trainCodeA=%s AND day=%s", (train_code, format_time(-day)))
+        "SELECT COUNT(*) FROM RECORDS WHERE trainCodeA=%s AND day=%s", (train_code, date.strftime('%Y%m%d')))
     if cursor.fetchone()[0] > 0:
-        logger.info(f"车次 {train_code} 在 {format_time(-day)} 已存在，移除数据")
+        logger.info(f"车次 {train_code} 在 {date.strftime('%Y-%m-%d')} 已存在，移除数据")
         cursor.execute(
-            "DELETE FROM RECORDS WHERE trainCodeA=%s AND day=%s", (train_code, format_time(-day)))
+            "DELETE FROM RECORDS WHERE trainCodeA=%s AND day=%s", (train_code, date.strftime('%Y%m%d')))
         conn.commit()
 
-    for _ in range(5):
-        try:
-            r2 = postM("trainTimeTable.queryTrainAllInfo", {
-                "fromStation": "",
-                "toStation": "",
-                "trainCode": train_code,
-                "trainType": "",
-                "trainDate": format_time(-day)
-            })
-            crj = json.loads(r2["trainData"])
-            tsfirst = deformat_time(
-                format_time(-day) + r2["train"]["start_time"])
-            i = {x["stationTrainCode"]
-                 for x in crj["stopTime"] if "stationTrainCode" in x}
-            i.add(train_code)
-            break
-        except Exception as e:
-            logger.info(f"车次 {train_code} 当天不开行")
-            PBAR.update()
-            return
+    try:
+        r2 = postM("trainTimeTable.queryTrainAllInfo", {
+            "fromStation": "",
+            "toStation": "",
+            "trainCode": train_code,
+            "trainType": "",
+            "trainDate": date.strftime('%Y%m%d')
+        })
+        crj = json.loads(r2["trainData"])
+        tsfirst = deformat_time(
+            date.strftime('%Y%m%d') + r2["train"]["start_time"])
+        i = {x["stationTrainCode"]
+             for x in crj["stopTime"] if "stationTrainCode" in x}
+        i.add(train_code)
+    except Exception as e:
+        logger.info(f"车次 {train_code} 当天不开行")
+        PBAR.update()
+        return
 
     if not i:
         logger.info(f"车次 {train_code} 无停靠数据")
         PBAR.update()
         return
-
-    for _ in range(3):
-        try:
-            d = postM("homepage.getTrainInfoImg", {
-                "startTrainDate": format_time(-day),
-                "trainCode": list(i)[0],
-                "trainSetName": ""
-            })
-            if d["isHaveData"] == "Y":
-                r = [fix_trainset(x["trainsetName"]) for x in d["trainInfo"]]
-                cursor.execute(
-                    "INSERT INTO RECORDS (day, timestamp, trainCodeA, trainCodeB, carA, carB) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (format_time(-day), tsfirst, list(i)
-                     [0], list(i)[1] if len(i) > 1 else "", r[0], r[1] if len(r) > 1 else "")
-                )
-                conn.commit()
-                conn.close()
-                logger.info(f"车次 {train_code} 编组 {'+'.join(r)}")
-                COMMITS += 1
-                PBAR.update()
-                time.sleep(0.05)
-                return
-        except Exception as e:
-            logger.warning(f"车次 {train_code} 无法写入数据库: {e}")
-            time.sleep(0.1)
+    
+    try:
+        d = postM("homepage.getTrainInfoImg", {
+            "startTrainDate": date.strftime('%Y%m%d'),
+            "trainCode": list(i)[0],
+            "trainSetName": ""
+        })
+        if d["isHaveData"] == "Y":
+            r = [fix_trainset(x["trainsetName"]) for x in d["trainInfo"]]
+            cursor.execute(
+                "INSERT INTO RECORDS (day, timestamp, trainCodeA, trainCodeB, carA, carB) VALUES (%s, %s, %s, %s, %s, %s)",
+                (date.strftime('%Y%m%d'), tsfirst, list(i)
+                 [0], list(i)[1] if len(i) > 1 else "", r[0], r[1] if len(r) > 1 else "")
+            )
+            conn.commit()
+            conn.close()
+            logger.info(f"车次 {train_code} 编组 {'+'.join(r)}")
+            COMMITS += 1
+            PBAR.update()
+            time.sleep(0.05)
+    except Exception as e:
+        logger.warning(f"车次 {train_code} 无法写入数据库: {e}")
+        time.sleep(0.1)
 
 
 def find_run_trains(day=0):

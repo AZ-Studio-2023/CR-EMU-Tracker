@@ -5,3 +5,4 @@ pycryptodome
 dbutils
 tqdm
 tqdm-logging-wrapper
+retry
