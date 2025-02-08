@@ -74,34 +74,21 @@ def fix_trainset(tsn):
 def get_train_list(day=0):
     global PBAR
     for key in ["D", "G", "C"]:
-        for tn in range(1, 100):
-            for _ in range(5):
-                try:
-                    req = requests.get(
-                        f"https://search.12306.cn/search/v1/h5/search?keyword={key + str(tn)}", verify=False)
-                    jr = req.json()
-                    cnt = 0
-                    for car in jr["data"]:
-                        if car["params"]["train_no"] in UNIQUE or car["type"] != "001":
-                            continue
-                        UNIQUE.add(car["params"]["train_no"])
-                        cnt += 1
-                        PBAR.total += 1
-                        yield car["params"]["station_train_code"]
-                    logger.info(f"{key}{tn} 号段搜索好，共 {cnt} 个车次")
-                    time.sleep(0.1)
-                    break
-                except Exception as e:
-                    logger.warning(f"{key}{tn} 号段限速: {e}")
-                    time.sleep(20)
-                    continue
+        try:
+            req = requests.get(
+                f"https://mobile.12306.cn/weixin/wxcore/queryTrain?ticket_no={key}&depart_date={format_time()}", verify=False)
+            for car in req.json()["data"]:
+                PBAR.total += 1
+                yield car["ticket_no"]
+        except Exception as e:
+            continue
 
 
 def parse_train_jl(train_code):
     global UNIQUE, COMMITS, PBAR
     conn = get_db_connection()
     cursor = conn.cursor()
-    date = datetime.datetime.utcnow() + datetime.timedelta(hours=8) - datetime.timedelta(days=DAY)
+    date = datetime.datetime.utcnow() + datetime.timedelta(hours=8) + datetime.timedelta(days=DAY)
 
     cursor.execute(
         "SELECT COUNT(*) FROM RECORDS WHERE trainCodeA=%s AND day=%s", (train_code, date.strftime('%Y%m%d')))
@@ -200,13 +187,13 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-d", "--day", help="爬取的日期（0为今天，5为未来第5天）", type=int, default=0)
+        "-d", "--day", help="爬取的日期（如0为今天，5为未来第5天，-2为前天）", type=int, default=0)
     args = parser.parse_args()
 
     current_dir = Path(__file__).resolve().parent
     os.chdir(current_dir)
 
-    if args.day < 0 or args.day > 10:
+    if args.day < -5 or args.day > 14:
         logger.error("ERROR: 超出可接受的数值范围")
         exit()
 
