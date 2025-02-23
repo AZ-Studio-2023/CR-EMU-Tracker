@@ -163,4 +163,3 @@ cython_debug/
 
 # Test
 cr-emu.log
-test.py
