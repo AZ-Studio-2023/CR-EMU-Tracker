@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>动车组担当查询 | {{ keyword }}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link href="https://cdn.zenglingkun.cn/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.zenglingkun.cn/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-50 flex flex-col min-h-screen">
+    <nav class="bg-blue-600 shadow">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex h-14 items-center">
+                <a href="/" class="text-white hover:bg-blue-700 px-3 py-2 rounded transition duration-150">
+                    <i class="fa fa-arrow-left"></i> 返回首页
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex-grow">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="bg-white shadow rounded-sm p-6 mb-6">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">动车组担当查询</h1>
+                <p class="text-gray-600 text-sm">
+                    <span class="font-semibold text-blue-600">{{ keyword }}</span>
+                </p>
+                <p class="text-gray-500 text-sm mt-2">
+                    以下是详细担当数据。数据仅供参考，请以实际运用为准。
+                </p>
+            </div>
+
+            <!-- Table Section -->
+            <div class="overflow-x-auto bg-white shadow rounded-sm">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                担当日</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                担当车次</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                车号</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detail-result" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">加载中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-blue-600 text-white py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <b>RailGo Project</b>&nbsp;&nbsp;|&nbsp;&nbsp;❤ Build with love
+            <br>
+            <span class="text-sm opacity-75">数据仅供参考，请以实际运用为准。</span>
+        </div>
+    </footer>
+
+    <script src="https://cdn.zenglingkun.cn/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            const keyword = "{{ keyword }}";
+            $.getJSON(`/api/query?keyword=${keyword}&future=true`, function (data) {
+                const $result = $("#detail-result");
+                $result.empty();
+                if (data.success && data.data.length > 0) {
+                    data.data.forEach((item, index) => {
+                        const trainNum = item.trainNum || [];
+                        const trainCode = item.trainCode || [];
+                        $result.append(`
+                            <tr class="hover:bg-gray-50 transition duration-300">
+                                <td class="px-6 py-4 text-sm text-gray-500">${index + 1}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500">${item.runDate}</td>
+                                <td class="px-6 py-4 text-sm">
+                                    ${trainNum.map(num => `<a class="text-blue-600 hover:text-blue-800 cursor-pointer" href="/detail/${num}">${num}</a>`).join(" / ")}
+                                </td>
+                                <td class="px-6 py-4 text-sm">
+                                    ${trainCode.map(code => `<a class="text-blue-600 hover:text-blue-800 cursor-pointer" href="/detail/${code}">${code}</a>`).join(" + ")}
+                                </td>
+                            </tr>
+                        `);
+                    });
+                } else {
+                    $result.append(`
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">未查询到数据。</td>
+                        </tr>
+                    `);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

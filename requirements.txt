@@ -1,5 +1,8 @@
 flask
+pymysql
+requests
 pycryptodome
-aiohttp
-aiomysql
-aiohttp[speedups]
+dbutils
+tqdm
+tqdm-logging-wrapper
+retry

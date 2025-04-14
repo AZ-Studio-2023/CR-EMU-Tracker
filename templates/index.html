@@ -6,11 +6,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit">
+    <meta name="google-site-verification" content="S77L4tvXcfARRAv6_WbmxJFV3hjXi-BcadKTccJziLI" />
     <link href="https://img.picui.cn/free/2024/11/08/672dd11519a5a.png" rel="icon">
     <link href="https://img.picui.cn/free/2024/11/08/672dd11519a5a.png" rel="shortcut icon">
-    <script src="https://cdn.jsdmirror.cn/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-    <link href="https://cdn.jsdmirror.cn/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdmirror.cn/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.zenglingkun.cn/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <link href="https://cdn.zenglingkun.cn/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.zenglingkun.cn/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <script>
         console.log('%c _______             __  __   ______            ', 'color: blue;');
         console.log('%c/       \\           /  |/  | /      \\           ', 'color: blue;');
@@ -33,16 +34,17 @@
             font-weight: normal;
         }
 
-        /* 添加进度条动画 */
         @keyframes loading {
             0% {
                 width: 0;
                 margin-left: 0;
             }
+
             50% {
                 width: 50%;
                 margin-left: 25%;
             }
+
             100% {
                 width: 0;
                 margin-left: 100%;
@@ -52,13 +54,51 @@
         .animate-loading {
             animation: loading 1.5s infinite ease-in-out;
         }
+
+        .announcement-slide {
+            transition: transform 0.5s ease-in-out;
+        }
+
+        @keyframes slideIn {
+            0% {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            0% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+        }
+
+        #announcement {
+            overflow: hidden;
+            height: 20px;
+        }
+
+        #announcement-text {
+            animation-duration: 0.5s;
+            animation-timing-function: ease-in-out;
+        }
     </style>
 </head>
 
 <body class="bg-gray-50 flex flex-col min-h-screen">
     <nav class="bg-blue-600 shadow">
         <div class="max-w-7xl mx-auto px-4">
-            <div class="flex flex-col md:flex-row justify-between py-3 md:h-14 md:py-0">
+            <div class="flex flex-col md:flex-row justify-between items-center py-3 md:h-14 md:py-0">
                 <div class="flex items-center justify-between">
                     <a href="/" class="text-white hover:bg-blue-700 px-3 py-2 rounded-sm transition duration-150">
                         <span class="text-lg font-semibold">动车组担当查询</span>
@@ -73,7 +113,7 @@
                         <span>Github</span>
                         <i class="fa fa-github"></i>
                     </a>
-                    <a href="/docs"
+                    <a href="https://github.com/AZ-Studio-2023/CR-EMU-Tracker/wiki/API%E6%96%87%E6%A1%A3"
                         class="text-white hover:bg-blue-700 px-4 py-2 rounded transition duration-150 flex items-center space-x-2">
                         <span>API文档</span>
                         <i class="fa fa-code"></i>
@@ -82,6 +122,11 @@
                         class="text-white hover:bg-blue-700 px-4 py-2 rounded transition duration-150 flex items-center space-x-2">
                         <span>关于</span>
                         <i class="fa fa-info-circle"></i>
+                    </a>
+                    <a href="https://www.zovps.com/aff/LEISZPEV"
+                        class="text-white hover:bg-blue-700 px-4 py-2 rounded transition duration-150 flex items-center space-x-2" target="_blank">
+                        <span>赞助商</span>
+                        <!-- <i class="fa-regular fa-heart"></i> -->
                     </a>
                 </div>
             </div>
@@ -118,10 +163,18 @@
                     <i class="fa fa-info-circle text-blue-500"></i>
                 </div>
                 <div class="ml-3 flex-1">
-                    <p class="text-sm text-blue-800">
-                        本站尚在测试中，信息可能存在缺失，请综合参考。详情请看<a href="/faq"
-                            class="font-medium underline hover:text-blue-900">关于页面</a><br>
-                        每天凌晨0:02-1:42更新当天数据，该时间段内查询可能出现缺失，请谅解。
+                    <div id="announcement" class="text-sm text-blue-800">
+                        <p id="announcement-text">加载中...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="summary-section" class="bg-yellow-100 p-4 mb-4 rounded hidden">
+                <div class="flex items-center">
+                    <i class="fa fa-info-circle text-yellow-500 mr-2"></i>
+                    <p class="text-sm text-yellow-800 flex-1">
+                        <span id="summary-message"></span>
+                        <a id="detail-link" href="#" class="text-blue-600 underline font-semibold">前往详细页查看</a>
                     </p>
                 </div>
             </div>
@@ -227,94 +280,149 @@
             }, 3000);
         }
 
-        function directSearch(n) {
-            $("#search-history-kw").val(n);
+        function createTooltip(element, message) {
+            const tooltip = document.createElement("div");
+            tooltip.className = "absolute bg-gray-800 text-white text-xs font-semibold py-1 px-2 rounded shadow-lg";
+            tooltip.style.display = "none";
+            tooltip.style.position = "absolute";
+            tooltip.style.zIndex = "1000";
+            tooltip.textContent = message;
+
+            document.body.appendChild(tooltip);
+
+            element.addEventListener("mouseenter", (e) => {
+                tooltip.style.display = "block";
+                tooltip.style.left = `${e.pageX + 10}px`;
+                tooltip.style.top = `${e.pageY + 10}px`;
+            });
+
+            element.addEventListener("mousemove", (e) => {
+                tooltip.style.left = `${e.pageX + 10}px`;
+                tooltip.style.top = `${e.pageY + 10}px`;
+            });
+
+            element.addEventListener("mouseleave", () => {
+                tooltip.style.display = "none";
+            });
+        }
+
+        function directSearch(keyword) {
+            $("#search-history-kw").val(keyword);
             $("#search-history-trigger").click();
         }
 
         function sortTable() {
-            $("#result").empty();
-            var data = JSON.parse(sessionStorage.getItem("cache"));
-            var showflag = $("#search-history-show-flag").is(":checked");
-            var k = 0;
-            if (data == undefined || data == null) {
-                $("#result").append(`<tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
-                        </tr>`);
-                return;
-            }
-            for (var i = 0; i < data.length; i++) {
-                if (!showflag && Date.now() < Date.parse(data[i].runDate)) {
-                    continue;
-                }
-                if (data[i].trainCode.split(" + ").length > 1) {
-                    $("#result").append(`<tr class="hover:bg-gray-50 transition duration-300"><td class="px-6 py-4 text-sm text-gray-500">${k + 1}</td><td class="px-6 py-4 text-sm text-gray-500">${data[i].runDate}</td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainNum.split("/")[0]}')">${data[i].trainNum}</a></td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode.split(" + ")[0]}')">${data[i].trainCode.split(" + ")[0]}</a> + <a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode.split(" + ")[1]}')">${data[i].trainCode.split(" + ")[1]}</a></td></tr>`);
-                } else {
-                    $("#result").append(`<tr class="hover:bg-gray-50 transition duration-300"><td class="px-6 py-4 text-sm text-gray-500">${k + 1}</td><td class="px-6 py-4 text-sm text-gray-500">${data[i].runDate}</td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainNum.split("/")[0]}')">${data[i].trainNum}</a></td><td class="px-6 py-4 text-sm"><a class="text-blue-600 hover:text-blue-800" href="javascript:directSearch('${data[i].trainCode}')">${data[i].trainCode}</a></td></tr>`);
-                }
-                k++;
-            }
+
         }
 
-        $("#search-history-show-flag").click((_) => {
-            sortTable();
-        });
-
-        $("#search-history-trigger").click((_) => {
-            var val = $("#search-history-kw").val();
+        function sendSearch() {
+            var val = $("#search-history-kw").val().toUpperCase();
+            var future = $("#search-history-show-flag").is(":checked");
+            $("#search-history-kw").val(val);
             if (val == "") {
                 showAlert("不能输入空值", "error");
                 return;
             }
 
-            // 显示进度条
             $("#loading-bar").removeClass("hidden");
-            
-            // 禁用查询按钮
+
             $("#search-history-trigger").prop("disabled", true);
             $("#search-history-trigger").addClass("opacity-50 cursor-not-allowed");
 
             $.ajax({
-                url: "/api/query",
+                url: "/api/query_summary",
                 method: "GET",
                 data: {
-                    keyword: val
+                    keyword: val,
+                    future: future
                 },
                 success: (data) => {
                     if (!data.success) {
                         showAlert("查询失败，请确保输入正确", "error");
                         return;
                     }
-
-                    if (data.success && data.data.length == 0) {
+                    $("#result").empty();
+                    let totalHiddenCount = 0; // Initialize total hidden count
+                    if (!data.data || data.data.length === 0) {
                         showAlert("未查询到数据", "warning");
+                        $("#result").append(`<tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">&nbsp;</td>
+                        </tr>`);
                         return;
                     }
-                    showAlert("查询成功","success");
-                    sessionStorage.setItem("cache", JSON.stringify(data.data));
-                    sortTable();
+                    showAlert("查询成功", "success");
+                    for (var i = 0; i < data.data.length; i++) {
+                        const dayData = data.data[i];
+                        const trainNum = dayData.earliest.trainNum || [];
+                        const trainCode = dayData.earliest.trainCode || [];
+                        const hiddenCount = dayData.hiddenCount;
+
+                        const row = $(`
+                            <tr class="hover:bg-gray-50 transition duration-300">
+                                <td class="px-6 py-4 text-sm text-gray-500">
+                                    ${i + 1}${hiddenCount > 0 ? `<sup class="text-blue-600 cursor-pointer tooltip-trigger">+${hiddenCount}</sup>` : ""}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500">${dayData.earliest.runDate}</td>
+                                <td class="px-6 py-4 text-sm">
+                                    ${trainNum.map(num => `<a class="text-blue-600 hover:text-blue-800 cursor-pointer" onclick="directSearch('${num}')">${num}</a>`).join(" / ")}
+                                </td>
+                                <td class="px-6 py-4 text-sm">
+                                    ${trainCode.map(code => `<a class="text-blue-600 hover:text-blue-800 cursor-pointer" onclick="directSearch('${code}')">${code}</a>`).join(" + ")}
+                                </td>
+                            </tr>
+                        `);
+                        $("#result").append(row);
+
+                        if (hiddenCount > 0) {
+                            row.find(".tooltip-trigger").each(function () {
+                                createTooltip(this, `当天还有 ${hiddenCount} 条数据，可进入详情页查看`);
+                            });
+                        }
+
+                        totalHiddenCount += hiddenCount; 
+
+                        if (hiddenCount > 8) {
+                            $("#result").append(`
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center">
+                                        <div class="bg-yellow-100 text-yellow-800 text-sm font-semibold py-2 px-4 rounded-lg border border-yellow-400 shadow">
+                                            数据过多，请点击下方按钮查看详情
+                                        </div>
+                                    </td>
+                                </tr>
+                            `);
+                        }
+                    }
+
+                    if (totalHiddenCount > 0) {
+                        $("#result").append(`
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center">
+                                    <a href="/detail/${val}" class="bg-blue-600 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow hover:bg-blue-700">
+                                        查看所有数据 (${totalHiddenCount} 条)
+                                    </a>
+                                </td>
+                            </tr>
+                        `);
+                    }
                 },
                 error: () => {
                     showAlert("网络错误，请稍后再试", "error");
                 },
                 timeout: 3000,
                 complete: () => {
-                    // 隐藏进度条
                     $("#loading-bar").addClass("hidden");
-                    
-                    // 启用查询按钮
                     $("#search-history-trigger").prop("disabled", false);
                     $("#search-history-trigger").removeClass("opacity-50 cursor-not-allowed");
                 }
-            })
-        });
+            });
+        }
 
-        $(window).on("beforeunload", (_) => {
-            sessionStorage.clear();
-        });
+        $("#search-history-show-flag").click(sendSearch);
+        $("#search-history-trigger").click(sendSearch);
 
         function updateStats() {
             $.ajax({
@@ -326,21 +434,54 @@
                     );
                 }
             });
-
-            if (!sessionStorage) {
-                showAlert("您的浏览器过于陈旧，不支持本站运行需要的部分功能，请升级浏览器再试。", "error");
-            }
         }
 
         updateStats();
 
         setInterval(updateStats, 300000);
 
-        document.getElementById('mobile-menu-button').addEventListener('click', function() {
+        document.getElementById('mobile-menu-button').addEventListener('click', function () {
             const menu = document.getElementById('mobile-menu');
             menu.classList.toggle('hidden');
         });
+
+        $(document).ready(function () {
+            $.getJSON("https://json.zenglingkun.cn/EMU/announcement.json?" + new Date().getTime(), function (data) {
+                let announcements = data;
+                let currentAnnouncement = 0;
+                let displayAnnouncement = function () {
+                    $("#announcement-text").css('animation-name', 'slideOut');
+                    setTimeout(function () {
+                        $("#announcement-text").text(announcements[currentAnnouncement].text);
+                        $("#announcement-text").css('animation-name', 'slideIn');
+                        let displayTime = announcements[currentAnnouncement].time ? announcements[currentAnnouncement].time * 1000 : 5000;
+                        setTimeout(function () {
+                            currentAnnouncement = (currentAnnouncement + 1) % announcements.length;
+                            displayAnnouncement();
+                        }, displayTime);
+                    }, 500);
+                };
+                displayAnnouncement();
+            });
+
+            const keyword = $("#search-history-kw").val();
+            if (keyword) {
+                $.getJSON(`/api/query_summary?keyword=${keyword}`, function (data) {
+                    if (data.success && data.data.length > 0) {
+                        let hiddenCount = 0;
+                        data.data.forEach(day => hiddenCount += day.hiddenCount);
+                        if (hiddenCount > 0) {
+                            $("#summary-message").text(`该关键词还有 ${hiddenCount} 条数据未显示。`);
+                            $("#detail-link").attr("href", `/detail/${keyword}`);
+                            $("#summary-section").removeClass("hidden");
+                        }
+                    }
+                });
+            }
+        });
     </script>
+    <!-- <script src="/static/autoload.js"></script> -->
+
 </body>
 
 </html>

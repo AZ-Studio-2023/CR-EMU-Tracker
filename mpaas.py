@@ -1,13 +1,15 @@
-import aiohttp
+import requests
 import json
 import hashlib
 import time
 import gzip
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
+from retry import retry
 
-async def postM(session: aiohttp.ClientSession, api: str, form: dict) -> dict:
-    """发送异步请求到 MpaaS 接口"""
+@retry(exceptions=Exception,tries=5,delay=2)
+def postM(api, form):
+    """发送请求到 MpaaS 接口"""
     ts = time.strftime("%Y%m%d%H%M%S")
     form["baseDTO"] = {
         "check_code": hashlib.md5(
@@ -58,17 +60,17 @@ async def postM(session: aiohttp.ClientSession, api: str, form: dict) -> dict:
         "x-Content-Encoding": "mgss",
         "Content-Type": "application/json",
     }
-    async with session.post("https://mobile.12306.cn/otsmobile/app/mgs/mgw.htm", data=payload, headers=headers) as response:
-        content = await response.read()
-        if not content:
-            raise ConnectionError(
-                f"mPaaS Request Failed: {response.headers.get('Result-Status', '')} "
-                f"{response.headers.get('Memo', '')}"
-            )
-        # 解密响应内容
-        decrypted_data = unpad(
-            AES.new(b'}\x00#\x15\xb7QQM\xdfK\xce\xc2\xbd\x15\xeeE', AES.MODE_CBC,
-                    b'F\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f').decrypt(content), 16
+    r=requests.post("https://mobile.12306.cn/otsmobile/app/mgs/mgw.htm", data=payload, headers=headers)
+    content = r.content
+    if not content:
+        raise ConnectionError(
+            f"mPaaS Request Failed: {response.headers.get('Result-Status', '')} "
+            f"{response.headers.get('Memo', '')}"
         )
-        decompressed_data = gzip.decompress(decrypted_data).decode()
-        return json.loads(decompressed_data)
+    # 解密响应内容
+    decrypted_data = unpad(
+        AES.new(b'}\x00#\x15\xb7QQM\xdfK\xce\xc2\xbd\x15\xeeE', AES.MODE_CBC,
+                b'F\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f').decrypt(content), 16
+    )
+    decompressed_data = gzip.decompress(decrypted_data).decode()
+    return json.loads(decompressed_data)

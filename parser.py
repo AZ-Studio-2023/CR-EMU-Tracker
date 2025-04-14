@@ -1,223 +1,190 @@
-import asyncio
-import aiohttp
-import aiomysql
-import logging
-import mpaas
-import json
+'''
+    2024-12-14
+    TrackTrain v2
+    动车组担当查询
+    by TKP30
+'''
+import requests
+import datetime
 import time
-from datetime import datetime, timedelta
+import sys
+from pymongo import MongoClient
 from pathlib import Path
 import os
+import json
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from mpaas import postM
+import tqdm
+import tqdm_logging_wrapper as tqdl
 
-UNIQUE = []
-commits = 0
+# 全局变量
+UNIQUE = set()
+COMMITS = 0
+DAY = 0
+PBAR = None
 
+# 日志配置
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("TrainTrack")
 logger.setLevel(logging.DEBUG)
 
-_fh = logging.FileHandler("cr-emu.log")
-_fh.setLevel(logging.DEBUG)
-logger.addHandler(_fh)
+file_handler = logging.FileHandler("cr-emu.log")
+file_handler.setLevel(logging.DEBUG)
+logger.addHandler(file_handler)
 
-mysql_pool = None
+requests.packages.urllib3.disable_warnings()
 
+# MongoDB连接
+client = MongoClient('mongodb://localhost:27017/')
+db = client['traintrack']
+collection = db.records
 
-def formatTime(offset=0):
-    return (datetime.utcnow() + timedelta(hours=8) - timedelta(days=offset)).strftime('%Y%m%d')
+def format_time(offset=0):
+    return (datetime.datetime.utcnow() + datetime.timedelta(hours=8) - 
+            datetime.timedelta(days=offset)).strftime('%Y%m%d')
 
+def deformat_time(ts):
+    return int(datetime.datetime.strptime(ts, "%Y%m%d%H%M").timestamp())
 
-def deformatTime(ts):
-    return int(datetime.strptime(ts, "%Y%m%d%H%M").timestamp())
-
-
-def fixTrainset(tsn):
+def fix_trainset(tsn):
     tsn = tsn.replace("CRH2C-1-", "CRH2C-")  # CRH2C一二代
     tsn = tsn.replace("CRH2C-2-", "CRH2C-")
     return tsn
 
-
-async def init_mysql_pool():
-    global mysql_pool
-    mysql_pool = await aiomysql.create_pool(
-        host="localhost",
-        user="root",
-        password="123456",
-        db="traintrack",
-        minsize=1,
-        maxsize=30,
-    )
-
-
-async def getTrainList(client, day=0):
-    global UNIQUE
+def get_train_list(day=0):
+    global PBAR
     for key in ["D", "G", "C"]:
-        for tn in range(1, 100):
-            for x in range(5):
-                try:
-                    async with client.get(
-                        f"https://search.12306.cn/search/v1/h5/search?keyword={key+str(tn)}",
-                        headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
-                        }
-                    ) as req:
-                        jr = await req.json()
-                        for car in jr["data"]:
-                            if car["params"]["train_no"] in UNIQUE or car["type"] != "001":
-                                continue
-                            yield car["params"]["station_train_code"]
-                            UNIQUE.append(car["params"]["train_no"])
-                        logger.info(f"{key}{tn} 号段搜索好，共{len(jr['data'])}个车次")
-                        await asyncio.sleep(0.25)
-                    break
-                except Exception as e:
-                    logger.info(f"{key}{tn} 号段限速: {str(e)}")
-                    await asyncio.sleep(20)
-                    continue
+        try:
+            req = requests.get(
+                f"https://mobile.12306.cn/weixin/wxcore/queryTrain?ticket_no={key}&depart_date={format_time()}", 
+                verify=False
+            )
+            for car in req.json()["data"]:
+                PBAR.total += 1
+                yield car["ticket_no"]
+        except Exception as e:
+            continue
 
+def parse_train_jl(train_code):
+    global UNIQUE, COMMITS, PBAR
+    date = datetime.datetime.utcnow() + datetime.timedelta(hours=8) + datetime.timedelta(days=DAY)
 
-async def parseTrainJL(client, i, day=0):
-    global UNIQUE, commits
+    # 检查并删除已存在记录
+    collection.delete_many({
+        "trainCodeA": train_code,
+        "day": date.strftime('%Y%m%d')
+    })
+
     try:
-        async with mysql_pool.acquire() as conn:
-            async with conn.cursor() as cursor:
-                codeFull = ""
-                tsfirst = -1
-
-                # 检查是否已存在记录
-                await cursor.execute(
-                    "SELECT * FROM RECORDS WHERE day=%s AND (trainCodeA=%s OR trainCodeB=%s)",
-                    (formatTime(-day), i, i)
-                )
-                if len(await cursor.fetchall()) > 0 and day != 0:
-                    return  # 重复车次
-
-                # 查询列车粗略信息（复车次，开行情况）
-                try:
-                    inf = await mpaas.postM(
-                        client,
-                        "trainTimeTable.queryTrainAllInfo",
-                        {
-                            "fromStation": "",
-                            "toStation": "",
-                            "trainCode": i,
-                            "trainType": "",
-                            "trainDate": formatTime(-day)
-                        }
-                    )
-
-                    if inf["succ_flag"] == "0":
-                        logger.info(f"车次{i} 今天不跑")
-                        return
-                    try:
-                        ti = json.loads(inf["trainData"])
-                    except:
-                        # 列车运行图调整
-                        logger.info(f"车次{i} 今天不跑")
-                        return
-                    
-                    tns = set()
-                    tns.add(i)
-                    for x in ti["stopTime"]:
-                        try:
-                            tns.add(x["dispTrainCode"])
-                        except:
-                            pass
-                    i = list(tns)
-                except Exception as e:
-                    logger.exception(e)
-
-                try:
-                    d = await mpaas.postM(
-                        client,
-                        "homepage.getTrainInfoImg",
-                        {
-                            "startTrainDate": formatTime(-day),
-                            "trainCode": i[0],
-                            "trainSetName": ""
-                        }
-                    )
-                    if d["isHaveData"] == "Y":
-                        r = [fixTrainset(x["trainsetName"])
-                             for x in d["trainInfo"]]
-                        await cursor.execute(
-                            """
-                            INSERT INTO RECORDS (day, timestamp, trainCodeA, trainCodeB, carA, carB)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                            """,
-                            (formatTime(-day),
-                             tsfirst,
-                             i[0],
-                             i[1] if len(i) > 1 else "",
-                             r[0],
-                             r[1] if len(r) > 1 else "")
-                        )
-                        logger.info(f"车次{i[0]} 编组{' + '.join(r)}")
-                        await conn.commit()
-                        commits += 1
-                except Exception as e:
-                    logger.exception(e)
+        r2 = postM("trainTimeTable.queryTrainAllInfo", {
+            "fromStation": "",
+            "toStation": "",
+            "trainCode": train_code,
+            "trainType": "",
+            "trainDate": date.strftime('%Y%m%d')
+        })
+        crj = json.loads(r2["trainData"])
+        tsfirst = deformat_time(
+            date.strftime('%Y%m%d') + r2["train"]["start_time"])
+        i = {x["stationTrainCode"]
+             for x in crj["stopTime"] if "stationTrainCode" in x}
+        i.add(train_code)
     except Exception as e:
-        logger.exception(e)
+        logger.info(f"车次 {train_code} 当天不开行")
+        PBAR.update()
+        return
 
+    if not i:
+        logger.info(f"车次 {train_code} 无停靠数据")
+        PBAR.update()
+        return
+    
+    try:
+        d = postM("homepage.getTrainInfoImg", {
+            "startTrainDate": date.strftime('%Y%m%d'),
+            "trainCode": list(i)[0],
+            "trainSetName": ""
+        })
+        if d["isHaveData"] == "Y":
+            r = [fix_trainset(x["trainsetName"]) for x in d["trainInfo"]]
+            collection.insert_one({
+                "day": date.strftime('%Y%m%d'),
+                "timestamp": tsfirst,
+                "trainCodeA": list(i)[0],
+                "trainCodeB": list(i)[1] if len(i) > 1 else "",
+                "carA": r[0],
+                "carB": r[1] if len(r) > 1 else ""
+            })
+            logger.info(f"车次 {train_code} 编组 {'+'.join(r)}")
+            COMMITS += 1
+            PBAR.update()
+            time.sleep(0.05)
+            if RECHECK:
+                table_data = collection.find({ "day": date.strftime('%Y%m%d'), "timestamp": tsfirst, "trainCodeA": list(i)[0], "trainCodeB": list(i)[1] if len(i) > 1 else ""})
+                if table_data :
+                    if table_data[0]["carA"] != r[0] or table_data[0]["carB"] != r[1] if len(r) > 1 else "":
+                        logger.warning(f"车次 {train_code} 数据库数据不符，重新插入")
+                        collection.delete_one(table_data[0])
+                        collection.insert_one({
+                            "day": date.strftime('%Y%m%d'),
+                            "timestamp": tsfirst,
+                            "trainCodeA": list(i)[0],
+                            "trainCodeB": list(i)[1] if len(i) > 1 else "",
+                            "carA": r[0],
+                            "carB": r[1] if len(r) > 1 else ""
+                        })
 
-async def findRunTrains(client, day=0):
-    global UNIQUE, commits
-    async with mysql_pool.acquire() as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute("""
-                CREATE TABLE IF NOT EXISTS RECORDS (
-                    day VARCHAR(10) NOT NULL,
-                    timestamp BIGINT NOT NULL,
-                    trainCodeA VARCHAR(50),
-                    trainCodeB VARCHAR(50),
-                    carA VARCHAR(50),
-                    carB VARCHAR(50)
-                )
-            """)
-            await conn.commit()
-            logger.info("数据库初始化完成，开始爬取数据")
+                        
+    except Exception as e:
+        logger.warning(f"车次 {train_code} 无法写入数据库: {e}")
+        time.sleep(0.1)
 
-    ta = time.time()
-    tasks = []
-    async for train_code in getTrainList(client, day):
-        tasks.append(parseTrainJL(client, train_code, day))
-    await asyncio.gather(*tasks)
+def find_run_trains(day=0):
+    global UNIQUE, COMMITS, DAY, PBAR
+    DAY = day
+    PBAR = tqdm.tqdm(total=0, desc="遍历车次", unit="组",
+                     position=0, file=sys.stdout)
 
-    logger.info(f"爬取完成 耗时{time.time()-ta}s 提交{commits}条记录")
+    # 确保索引存在
+    collection.create_index([("day", 1)])
+    collection.create_index([("trainCodeA", 1)])
+    collection.create_index([("trainCodeB", 1)])
+    collection.create_index([("carA", 1)])
+    collection.create_index([("carB", 1)])
+    
+    logger.info("数据库初始化完成，启动主循环")
+
+    with ThreadPoolExecutor(30) as executor:
+        with tqdl.wrap_logging_for_tqdm(PBAR, logger=logger):
+            executor.map(parse_train_jl, get_train_list(day))
+
+    PBAR.close()
+
+    logger.info(f"{format_time(-day)} 爬取完成")
+    logger.info(f"提交了 {COMMITS} 行记录")
 
     if day == 0:
-        async with mysql_pool.acquire() as conn:
-            async with conn.cursor() as cursor:
-                await cursor.execute("DELETE FROM RECORDS WHERE day < %s", (formatTime(60),))
-                await conn.commit()
-                logger.info("清除完成60天前数据")
-
+        # 删除60天前的数据
+        collection.delete_many({"day": {"$lt": format_time(60)}})
+        logger.info("清除完成60天前数据")
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-d", "--day", help="爬取的日期（0为今天，5为未来第5天）", type=int, default=0)
+        "-d", "--day", help="爬取的日期（如0为今天，5为未来第5天，-2为前天）", type=int, default=0)
+    parser.add_argument(
+        "-r", "--recheck", help="提交数据到数据库时再次请求核对", action='store_true')
     args = parser.parse_args()
-
+    RECHECK = args.recheck
     current_dir = Path(__file__).resolve().parent
     os.chdir(current_dir)
 
-    if args.day < 0 or args.day > 10:
-        print("ERROR: 超出可接受的数值范围")
+    if args.day < -5 or args.day > 14:
+        logger.error("ERROR: 超出可接受的数值范围")
         exit()
 
     logger.info("====CR-TRACKER====")
-    logger.info(f"开始爬取：第{args.day}天数据")
-
-    async def main():
-        await init_mysql_pool()
-        connector = aiohttp.TCPConnector(ssl=False)
-        async with aiohttp.ClientSession(connector=connector) as client:
-            await findRunTrains(client, args.day)
-        mysql_pool.close()
-        await mysql_pool.wait_closed()
-
-    asyncio.run(main())
-    logger.info("完成")
+    logger.info(f"开始爬取：{args.day}天数据")
+    find_run_trains(args.day)
