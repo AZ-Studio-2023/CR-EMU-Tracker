@@ -1,3 +1,5 @@
+# 自12306 5.9版本起，铁科院方面升级了APP端的安全防护措施，增加网关通讯强制验签机制，因此导致本仓库的实现已经无法使用，网站也已同步关停。如有了解MpaaS 蓝盾签名算法实现的信息，也可以联系我们，QQ：572747232，非常感谢您的支持。
+
 # <center>CR-EMU-Tracker</center>
 #### <center>中国铁路动车组担当运行追踪查询</center>
 *<center>Part of RailGo Project</center>*
